@@ -7,6 +7,10 @@ const cookieParser = require('cookie-parser');
 const { Server } = require('socket.io');
 const connectDB = require('./config/db');
 const authRoutes = require('./routes/authRoutes');
+const categoryRoutes = require('./routes/categoryRoutes');
+const modifierRoutes = require('./routes/modifierRoutes');
+const menuItemRoutes = require('./routes/menuItemRoutes');
+const tableRoutes = require('./routes/tableRoutes');
 const errorHandler = require('./middleware/errorHandler');
 
 const requiredEnvVars = ['MONGO_URI', 'JWT_ACCESS_SECRET', 'JWT_REFRESH_SECRET'];
@@ -52,6 +56,10 @@ app.get('/api/health', (req, res) => {
 });
 
 app.use('/api/auth', authRoutes);
+app.use('/api/categories', categoryRoutes);
+app.use('/api/modifiers', modifierRoutes);
+app.use('/api/menu-items', menuItemRoutes);
+app.use('/api/tables', tableRoutes);
 app.use(errorHandler);
 
 const port = process.env.PORT || 5000;
