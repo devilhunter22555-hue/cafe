@@ -148,4 +148,194 @@ async function getOrderById(req, res, next) {
   }
 }
 
-module.exports = { createOrder, getOrders, getOrderById };
+async function addItemsToOrder(req, res, next) {
+  try {
+    const { items } = req.body;
+    if (!Array.isArray(items) || items.length === 0) {
+      throw createError('At least one order item is required', 400);
+    }
+
+    const order = await Order.findOne({
+      _id: req.params.id,
+      restaurantId: req.restaurantId,
+      branchId: req.branchId
+    });
+    if (!order) throw createError('Order not found', 404);
+    if (order.status !== 'open') throw createError('Only open orders can receive new items', 400);
+
+    const menuItemIds = items.map((item) => item.menuItemId);
+    if (menuItemIds.some((id) => !mongoose.Types.ObjectId.isValid(id))) {
+      throw createError('Each order item must reference a valid menu item', 400);
+    }
+
+    const menuItems = await MenuItem.find({
+      _id: { $in: menuItemIds },
+      restaurantId: req.restaurantId,
+      branchId: req.branchId,
+      isAvailable: true
+    });
+    const menuItemsById = new Map(menuItems.map((item) => [item._id.toString(), item]));
+    const newItems = items.map((item) => {
+      const menuItem = menuItemsById.get(item.menuItemId.toString());
+      if (!menuItem) throw createError(`Menu item not found: ${item.menuItemId}`, 404);
+
+      const quantity = Number(item.qty);
+      if (!Number.isInteger(quantity) || quantity <= 0) {
+        throw createError('Item quantity must be a positive integer', 400);
+      }
+
+      return {
+        menuItemId: menuItem._id,
+        name: menuItem.name,
+        price: menuItem.price,
+        taxSlab: menuItem.taxSlab,
+        qty: quantity,
+        selectedModifiers: Array.isArray(item.selectedModifiers)
+          ? item.selectedModifiers.map((modifier) => ({
+              name: modifier.name,
+              priceDelta: Number(modifier.priceDelta) || 0
+            }))
+          : [],
+        notes: item.notes,
+        status: 'pending'
+      };
+    });
+
+    order.items.push(...newItems);
+    const totals = calculateOrderTotals(order.items, order.discount);
+    order.set(totals);
+    await order.save();
+
+    const io = req.app.get('io');
+    if (io) io.to(`branch_${req.branchId}`).emit('new-kot', {
+      orderId: order._id,
+      newItems: order.items.slice(-newItems.length),
+      order
+    });
+
+    res.json({ success: true, data: order, message: 'Items added to order successfully' });
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function updateItemStatus(req, res, next) {
+  try {
+    const allowedStatuses = ['pending', 'preparing', 'ready', 'served'];
+    const { status } = req.body;
+    if (!allowedStatuses.includes(status)) {
+      throw createError('Invalid item status', 400);
+    }
+
+    const order = await Order.findOne({
+      _id: req.params.id,
+      restaurantId: req.restaurantId,
+      branchId: req.branchId
+    });
+    if (!order) throw createError('Order not found', 404);
+
+    const item = order.items.id(req.params.itemId);
+    if (!item) throw createError('Order item not found', 404);
+    item.status = status;
+    await order.save();
+
+    const io = req.app.get('io');
+    if (io) io.to(`branch_${req.branchId}`).emit('item-status-update', {
+      orderId: order._id,
+      itemId: item._id,
+      newStatus: status
+    });
+
+    res.json({ success: true, data: order, message: 'Item status updated successfully' });
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function cancelItem(req, res, next) {
+  try {
+    const order = await Order.findOne({
+      _id: req.params.id,
+      restaurantId: req.restaurantId,
+      branchId: req.branchId
+    });
+    if (!order) throw createError('Order not found', 404);
+
+    const item = order.items.id(req.params.itemId);
+    if (!item) throw createError('Order item not found', 404);
+    if (item.status !== 'pending') {
+      throw createError('Only pending items can be cancelled', 400);
+    }
+
+    item.status = 'cancelled';
+    order.set(calculateOrderTotals(order.items, order.discount));
+    await order.save();
+
+    const io = req.app.get('io');
+    if (io) io.to(`branch_${req.branchId}`).emit('item-cancelled', {
+      orderId: order._id,
+      itemId: item._id
+    });
+
+    res.json({ success: true, data: order, message: 'Item cancelled successfully' });
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function generateBill(req, res, next) {
+  const session = await mongoose.startSession();
+
+  try {
+    const discount = Number(req.body.discount) || 0;
+    if (discount < 0) throw createError('Discount cannot be negative', 400);
+
+    let order;
+    let totals;
+    await session.withTransaction(async () => {
+      order = await Order.findOne({
+        _id: req.params.id,
+        restaurantId: req.restaurantId,
+        branchId: req.branchId
+      }).session(session);
+      if (!order) throw createError('Order not found', 404);
+      if (order.status !== 'open') throw createError('Only open orders can be billed', 400);
+
+      if (!order.items.some((item) => item.status !== 'cancelled')) {
+        throw createError('Cannot bill an order with no active items', 400);
+      }
+
+      totals = calculateOrderTotals(order.items, discount);
+      order.set({ ...totals, discount, status: 'billed' });
+      await order.save({ session });
+
+      if (order.orderType === 'dine-in' && order.tableId) {
+        await Table.updateOne(
+          { _id: order.tableId, restaurantId: req.restaurantId, branchId: req.branchId },
+          { $set: { status: 'free' } },
+          { session }
+        );
+      }
+    });
+
+    res.json({
+      success: true,
+      data: { order, breakdown: totals },
+      message: 'Bill generated successfully'
+    });
+  } catch (error) {
+    next(error);
+  } finally {
+    await session.endSession();
+  }
+}
+
+module.exports = {
+  createOrder,
+  getOrders,
+  getOrderById,
+  addItemsToOrder,
+  updateItemStatus,
+  cancelItem,
+  generateBill
+};

@@ -14,7 +14,7 @@ const orderItemSchema = new mongoose.Schema({
   notes: String,
   status: { type: String, enum: ['pending', 'preparing', 'ready', 'served', 'cancelled'], default: 'pending' },
   kotNumber: String
-}, { _id: false });
+});
 
 const orderSchema = new mongoose.Schema({
   orderType: { type: String, enum: ['dine-in', 'takeaway'], required: true },
