@@ -40,7 +40,9 @@ export function AuthProvider({ children }) {
   const login = async (email, password) => {
     dispatch({ type: 'AUTH_START' })
     try {
-      const { data } = await axiosInstance.post('/auth/login', { email, password })
+      const response = await axiosInstance.post('/auth/login', { email, password })
+      console.log('[AuthContext] login response:', response)
+      const { data } = response
       setAccessToken(data.data.accessToken)
       dispatch({ type: 'AUTH_SUCCESS', payload: authPayload(data.data) })
     } catch (error) {
