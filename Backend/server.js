@@ -6,6 +6,8 @@ const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const { Server } = require('socket.io');
 const connectDB = require('./config/db');
+const authRoutes = require('./routes/authRoutes');
+const errorHandler = require('./middleware/errorHandler');
 
 const requiredEnvVars = ['MONGO_URI', 'JWT_ACCESS_SECRET', 'JWT_REFRESH_SECRET'];
 const missingEnvVars = requiredEnvVars.filter((name) => !process.env[name]);
@@ -46,8 +48,11 @@ io.on('connection', (socket) => {
 app.set('io', io);
 
 app.get('/api/health', (req, res) => {
-  res.json({ success: true, message: 'Server running' });
+  res.json({ success: true, data: null, message: 'Server running' });
 });
+
+app.use('/api/auth', authRoutes);
+app.use(errorHandler);
 
 const port = process.env.PORT || 5000;
 
