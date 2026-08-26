@@ -11,6 +11,7 @@ const categoryRoutes = require('./routes/categoryRoutes');
 const modifierRoutes = require('./routes/modifierRoutes');
 const menuItemRoutes = require('./routes/menuItemRoutes');
 const tableRoutes = require('./routes/tableRoutes');
+const orderRoutes = require('./routes/orderRoutes');
 const errorHandler = require('./middleware/errorHandler');
 
 const requiredEnvVars = ['MONGO_URI', 'JWT_ACCESS_SECRET', 'JWT_REFRESH_SECRET'];
@@ -60,6 +61,7 @@ app.use('/api/categories', categoryRoutes);
 app.use('/api/modifiers', modifierRoutes);
 app.use('/api/menu-items', menuItemRoutes);
 app.use('/api/tables', tableRoutes);
+app.use('/api/orders', orderRoutes);
 app.use(errorHandler);
 
 const port = process.env.PORT || 5000;

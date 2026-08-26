@@ -5,6 +5,7 @@ const orderItemSchema = new mongoose.Schema({
   menuItemId: { type: mongoose.Schema.Types.ObjectId, ref: 'MenuItem', required: true },
   name: { type: String, required: true },
   price: { type: Number, required: true },
+  taxSlab: { type: Number, enum: [5, 18], required: true },
   qty: { type: Number, required: true },
   selectedModifiers: [{
     name: { type: String, required: true },
