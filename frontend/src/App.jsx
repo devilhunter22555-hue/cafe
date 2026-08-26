@@ -6,6 +6,7 @@ import Dashboard from './pages/Dashboard.jsx'
 import MenuManagement from './pages/MenuManagement.jsx'
 import TableManagement from './pages/TableManagement.jsx'
 import POS from './pages/POS.jsx'
+import KitchenDisplay from './pages/KitchenDisplay.jsx'
 
 function Placeholder({ children }) {
   return <main className="p-6"><p className="text-xl font-semibold text-secondary">{children}</p></main>
@@ -20,7 +21,7 @@ function App() {
       <Route path="/dashboard/menu" element={<MenuManagement />} />
       <Route path="/dashboard/tables" element={<TableManagement />} />
       <Route path="/dashboard/pos" element={<POS />} />
-      <Route path="/dashboard/kitchen" element={<Placeholder>Kitchen display coming soon</Placeholder>} />
+      <Route path="/dashboard/kitchen" element={<KitchenDisplay />} />
       <Route path="/dashboard/billing" element={<Placeholder>Billing page coming soon</Placeholder>} />
       <Route path="/menu" element={<MenuManagement />} />
       <Route path="/tables" element={<TableManagement />} />
