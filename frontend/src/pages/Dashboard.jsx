@@ -1,11 +1,21 @@
-import { LogOut, Store } from 'lucide-react'
+import { ChefHat, LayoutGrid, LogOut, Receipt, ShoppingCart, Store, UtensilsCrossed } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
 
 function Dashboard() {
-  const { user, role, logout } = useAuth()
-  return <main className="min-h-screen bg-slate-100">
-    <header className="flex items-center justify-between border-b border-slate-200 bg-white px-6 py-4"><div className="flex items-center gap-3"><Store className="text-primary" /><span className="font-bold text-secondary">Restaurant POS</span></div><button className="btn-secondary flex items-center gap-2" onClick={logout} type="button"><LogOut size={16} /> Sign out</button></header>
-    <section className="mx-auto max-w-6xl px-6 py-12"><p className="text-sm font-semibold uppercase tracking-widest text-primary">Overview</p><h1 className="mt-2 text-4xl font-bold text-secondary">Good to see you, {user?.name || 'there'}.</h1><div className="mt-8 grid gap-4 sm:grid-cols-3"><div className="card"><p className="text-sm text-slate-500">Your role</p><p className="mt-2 text-2xl font-bold capitalize text-secondary">{role}</p></div><div className="card"><p className="text-sm text-slate-500">Branch</p><p className="mt-2 text-2xl font-bold text-secondary">{user?.branchId ? 'Assigned' : 'All branches'}</p></div><div className="card"><p className="text-sm text-slate-500">Workspace status</p><p className="mt-2"><span className="badge-success">Online</span></p></div></div></section>
+  const { user, logout } = useAuth()
+  const navigate = useNavigate()
+  const navigationCards = [
+    { title: 'Manage Menu', description: 'Organize dishes and categories.', path: '/dashboard/menu', icon: UtensilsCrossed },
+    { title: 'Manage Tables', description: 'Track tables and reservations.', path: '/dashboard/tables', icon: LayoutGrid },
+    { title: 'New Order', description: 'Start a new customer order.', path: '/dashboard/pos', icon: ShoppingCart },
+    { title: 'Kitchen Display', description: 'Keep up with active orders.', path: '/dashboard/kitchen', icon: ChefHat },
+    { title: 'Billing', description: 'Review payments and invoices.', path: '/dashboard/billing', icon: Receipt },
+  ]
+
+  return <main className="min-h-screen bg-gray-50">
+    <header className="flex items-center justify-between bg-white px-6 py-4 shadow-sm"><div className="flex items-center gap-3"><Store className="text-primary" /><span className="text-xl font-bold text-secondary">Restaurant POS</span></div><div className="flex items-center gap-4"><span className="text-sm text-gray-600">Welcome, {user?.name || 'there'}</span><button className="btn-secondary flex items-center gap-2 px-3 py-1.5 text-sm" onClick={logout} type="button"><LogOut size={16} /> Logout</button></div></header>
+    <section className="p-6 md:p-8"><h1 className="mb-2 text-2xl font-bold text-secondary">Welcome back!</h1><p className="mb-8 text-gray-500">Here's what's happening today</p><div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">{navigationCards.map(({ title, description, path, icon: Icon }) => <button className="card cursor-pointer text-left transition-all hover:-translate-y-0.5 hover:shadow-lg" key={path} onClick={() => navigate(path)} type="button"><span className="flex w-fit rounded-full bg-primary/10 p-3"><Icon className="text-primary" size={24} /></span><span className="mt-3 block font-semibold text-secondary">{title}</span><span className="mt-1 block text-sm text-gray-500">{description}</span></button>)}</div></section>
   </main>
 }
 
