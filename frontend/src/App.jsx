@@ -3,6 +3,7 @@ import ProtectedRoute from './components/ProtectedRoute.jsx'
 import Login from './pages/Login.jsx'
 import Register from './pages/Register.jsx'
 import Dashboard from './pages/Dashboard.jsx'
+import MenuManagement from './pages/MenuManagement.jsx'
 
 function App() {
   return <Routes>
@@ -10,6 +11,7 @@ function App() {
     <Route path="/register" element={<Register />} />
     <Route element={<ProtectedRoute />}>
       <Route path="/dashboard" element={<Dashboard />} />
+      <Route path="/menu" element={<MenuManagement />} />
       <Route path="/" element={<Dashboard />} />
     </Route>
     <Route path="*" element={<Navigate to="/" replace />} />
