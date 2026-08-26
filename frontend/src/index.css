@@ -29,3 +29,9 @@
   .badge-danger { @apply rounded-full bg-red-100 px-2 py-1 text-xs font-medium text-red-800; }
   .badge-warning { @apply rounded-full bg-amber-100 px-2 py-1 text-xs font-medium text-amber-800; }
 }
+
+@media print {
+  body * { visibility: hidden; }
+  #printable-bill, #printable-bill * { visibility: visible; }
+  #printable-bill { position: absolute; inset: 0; width: 100%; box-shadow: none; }
+}
