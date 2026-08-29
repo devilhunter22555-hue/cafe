@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Minus, Plus, Send, X } from 'lucide-react'
+import { Loader2, Minus, Plus, Send, ShoppingCart, UtensilsCrossed, X } from 'lucide-react'
 import { getCategories, getMenuItems } from '../api/menuApi.js'
 import { addItemsToOrder, createOrder } from '../api/orderApi.js'
 import { getTables } from '../api/tableApi.js'
@@ -18,6 +18,10 @@ function POS() {
   const [openOrders, setOpenOrders] = useState({})
   const [successMessage, setSuccessMessage] = useState('')
   const [error, setError] = useState('')
+  const [search, setSearch] = useState('')
+  const [recentlyAdded, setRecentlyAdded] = useState(null)
+  const [sending, setSending] = useState(false)
+  const [toast, setToast] = useState(null)
 
   useEffect(() => {
     joinBranch(branchId)
@@ -33,9 +37,18 @@ function POS() {
       .catch((requestError) => setError(requestError.response?.data?.message || 'Unable to load POS data'))
   }, [])
 
-  const visibleItems = useMemo(() => selectedCategory === 'all'
-    ? items
-    : items.filter((item) => (item.categoryId?._id || item.categoryId) === selectedCategory), [items, selectedCategory])
+  useEffect(() => {
+    if (!toast) return undefined
+    const timer = window.setTimeout(() => setToast(null), 2000)
+    return () => window.clearTimeout(timer)
+  }, [toast])
+
+  const visibleItems = useMemo(() => {
+    const categoryItems = selectedCategory === 'all'
+      ? items
+      : items.filter((item) => (item.categoryId?._id || item.categoryId) === selectedCategory)
+    return categoryItems.filter((item) => item.name.toLowerCase().includes(search.toLowerCase()))
+  }, [items, search, selectedCategory])
 
   const subtotal = cart.reduce((total, item) => total + (Number(item.price) * item.qty), 0)
   const orderKey = orderType === 'dine-in' ? selectedTable : 'takeaway'
@@ -46,6 +59,8 @@ function POS() {
       if (existing) return currentCart.map((cartItem) => cartItem._id === item._id ? { ...cartItem, qty: cartItem.qty + 1 } : cartItem)
       return [...currentCart, { ...item, qty: 1 }]
     })
+    setRecentlyAdded(item._id)
+    window.setTimeout(() => setRecentlyAdded(null), 180)
   }
 
   const changeQuantity = (id, amount) => {
@@ -58,6 +73,7 @@ function POS() {
 
   const sendToKitchen = async () => {
     if (!cart.length || (orderType === 'dine-in' && !selectedTable)) return
+    setSending(true)
     try {
       const itemsToSend = cart.map((item) => ({ menuItemId: item._id, qty: item.qty }))
       if (openOrders[orderKey]) await addItemsToOrder(openOrders[orderKey], itemsToSend)
@@ -68,9 +84,14 @@ function POS() {
       setCart([])
       setError('')
       setSuccessMessage('Order sent to kitchen')
+      setToast({ message: 'Order sent to kitchen!', type: 'success' })
       window.setTimeout(() => setSuccessMessage(''), 2500)
     } catch (requestError) {
-      setError(requestError.response?.data?.message || 'Unable to send order to kitchen')
+      const message = requestError.response?.data?.message || 'Unable to send order to kitchen'
+      setError(message)
+      setToast({ message, type: 'error' })
+    } finally {
+      setSending(false)
     }
   }
 
@@ -78,9 +99,10 @@ function POS() {
     <header className="flex items-center justify-between border-b border-gray-200 bg-white px-6 py-3"><div className="flex items-center gap-2 rounded-lg bg-gray-100 p-1"><button className={`rounded-lg px-4 py-2 text-sm ${orderType === 'dine-in' ? 'bg-white font-medium text-primary shadow-sm' : 'text-gray-500'}`} onClick={() => setOrderType('dine-in')} type="button">Dine In</button><button className={`rounded-lg px-4 py-2 text-sm ${orderType === 'takeaway' ? 'bg-white font-medium text-primary shadow-sm' : 'text-gray-500'}`} onClick={() => setOrderType('takeaway')} type="button">Takeaway</button></div>{orderType === 'dine-in' && <select className="input-field w-40" value={selectedTable} onChange={(event) => setSelectedTable(event.target.value)}><option value="">Select table</option>{tables.map((table) => <option key={table._id} value={table._id}>Table {table.tableNumber}</option>)}</select>}</header>
     <div className="flex min-h-0 flex-1 overflow-hidden">
       <aside className="w-48 shrink-0 overflow-y-auto border-r bg-white py-4"><button className={`w-full border-l-4 px-4 py-3 text-left text-sm ${selectedCategory === 'all' ? 'border-l-primary bg-primary/10 font-medium text-primary' : 'border-l-transparent text-gray-500 hover:text-secondary'}`} onClick={() => setSelectedCategory('all')} type="button">All Items</button>{categories.map((category) => <button className={`w-full border-l-4 px-4 py-3 text-left text-sm ${selectedCategory === category._id ? 'border-l-primary bg-primary/10 font-medium text-primary' : 'border-l-transparent text-gray-500 hover:text-secondary'}`} key={category._id} onClick={() => setSelectedCategory(category._id)} type="button">{category.name}</button>)}</aside>
-      <section className="min-w-0 flex-1 overflow-y-auto bg-gray-50 p-4">{error && <p className="mb-4 rounded-lg border border-danger bg-red-50 p-3 text-sm text-danger">{error}</p>}{successMessage && <p className="mb-4 rounded-lg border border-success bg-green-50 p-3 text-sm text-success">{successMessage}</p>}<div className="grid grid-cols-2 gap-3 lg:grid-cols-3">{visibleItems.map((item) => <button className="card border border-transparent p-3 text-left transition hover:border-primary hover:shadow-md" key={item._id} onClick={() => addToCart(item)} type="button"><span className={`mr-2 inline-block h-3 w-3 rounded-full ${item.isVeg ? 'bg-success' : 'bg-danger'}`} /><span className="font-medium text-secondary">{item.name}</span><p className="mt-2 font-bold text-primary">{Number(item.price).toFixed(2)}</p></button>)}</div></section>
-      <aside className="flex w-96 shrink-0 flex-col border-l bg-white"><header className="border-b px-4 py-3 font-semibold text-secondary">Current Order</header><div className="flex-1 overflow-y-auto p-4">{cart.length ? cart.map((item) => <div className="mb-4 flex items-center justify-between gap-2" key={item._id}><div className="min-w-0"><p className="truncate text-sm font-medium text-secondary">{item.name}</p><p className="text-sm text-gray-500">{(Number(item.price) * item.qty).toFixed(2)}</p></div><div className="flex items-center gap-2"><button aria-label={`Decrease ${item.name}`} className="rounded border p-1 text-gray-500 hover:text-primary" onClick={() => changeQuantity(item._id, -1)} type="button"><Minus size={14} /></button><span className="w-5 text-center text-sm">{item.qty}</span><button aria-label={`Increase ${item.name}`} className="rounded border p-1 text-gray-500 hover:text-primary" onClick={() => changeQuantity(item._id, 1)} type="button"><Plus size={14} /></button><button aria-label={`Remove ${item.name}`} className="ml-1 text-gray-400 hover:text-danger" onClick={() => setCart((currentCart) => currentCart.filter((cartItem) => cartItem._id !== item._id))} type="button"><X size={16} /></button></div></div>) : <div className="flex h-full items-center justify-center text-gray-400">No items added yet</div>}</div><div className="border-t p-4"><div className="mb-3 flex justify-between font-semibold text-secondary"><span>Subtotal</span><span>{subtotal.toFixed(2)}</span></div><button className="btn-primary flex w-full items-center justify-center gap-2 py-3" disabled={!cart.length || (orderType === 'dine-in' && !selectedTable)} onClick={sendToKitchen} type="button"><Send size={18} /> Send to Kitchen</button></div></aside>
+      <section className="min-w-0 flex-1 overflow-y-auto bg-gray-50 p-4"><input className="input-field mb-4" onChange={(event) => setSearch(event.target.value)} placeholder="Search menu items" value={search} />{error && <p className="mb-4 rounded-lg border border-danger bg-red-50 p-3 text-sm text-danger">{error}</p>}{successMessage && <p className="mb-4 rounded-lg border border-success bg-green-50 p-3 text-sm text-success">{successMessage}</p>}{visibleItems.length ? <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">{visibleItems.map((item) => <button className={`card border border-transparent p-3 text-left transition duration-150 hover:border-primary hover:shadow-md ${recentlyAdded === item._id ? 'scale-95 ring-2 ring-primary/30' : 'scale-100'}`} key={item._id} onClick={() => addToCart(item)} type="button"><span className={`mr-2 inline-block h-3 w-3 rounded-full ${item.isVeg ? 'bg-success' : 'bg-danger'}`} /><span className="font-medium text-secondary">{item.name}</span><p className="mt-2 font-bold text-primary">{Number(item.price).toFixed(2)}</p></button>)}</div> : <div className="flex min-h-[50vh] flex-col items-center justify-center text-gray-400"><UtensilsCrossed size={40} /><p className="mt-3">No items in this category</p></div>}</section>
+      <aside className="flex w-96 shrink-0 flex-col border-l bg-white"><header className="border-b px-4 py-3 font-semibold text-secondary">Current Order</header><div className="flex-1 overflow-y-auto p-4">{cart.length ? cart.map((item) => <div className="mb-4 flex items-center justify-between gap-2" key={item._id}><div className="min-w-0"><p className="truncate text-sm font-medium text-secondary">{item.name}</p><p className="text-sm text-gray-500">{(Number(item.price) * item.qty).toFixed(2)}</p></div><div className="flex items-center gap-2"><button aria-label={`Decrease ${item.name}`} className="rounded border p-1 text-gray-500 hover:text-primary" onClick={() => changeQuantity(item._id, -1)} type="button"><Minus size={14} /></button><span className="w-5 text-center text-sm">{item.qty}</span><button aria-label={`Increase ${item.name}`} className="rounded border p-1 text-gray-500 hover:text-primary" onClick={() => changeQuantity(item._id, 1)} type="button"><Plus size={14} /></button><button aria-label={`Remove ${item.name}`} className="ml-1 text-gray-400 hover:text-danger" onClick={() => setCart((currentCart) => currentCart.filter((cartItem) => cartItem._id !== item._id))} type="button"><X size={16} /></button></div></div>) : <div className="flex h-full flex-col items-center justify-center text-gray-400"><ShoppingCart className="mb-3 text-gray-300" size={40} /><span>No items added yet</span></div>}</div><div className="border-t p-4"><div className="mb-3 flex justify-between font-semibold text-secondary"><span>Subtotal</span><span>{subtotal.toFixed(2)}</span></div><button className="btn-primary flex w-full items-center justify-center gap-2 py-3" disabled={sending || !cart.length || (orderType === 'dine-in' && !selectedTable)} onClick={sendToKitchen} type="button">{sending ? <><Loader2 className="animate-spin" size={18} /> Sending...</> : <><Send size={18} /> Send to Kitchen</>}</button></div></aside>
     </div>
+    {toast && <div className={`fixed bottom-4 right-4 z-50 rounded-lg px-4 py-3 text-white shadow-lg ${toast.type === 'error' ? 'bg-danger' : 'bg-secondary'}`}>{toast.message}</div>}
   </main>
 }
 
