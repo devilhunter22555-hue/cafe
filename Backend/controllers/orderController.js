@@ -2,12 +2,18 @@ const mongoose = require('mongoose');
 const MenuItem = require('../models/MenuItem');
 const Order = require('../models/Order');
 const Table = require('../models/Table');
+const Bill = require('../models/Bill');
 const calculateOrderTotals = require('../utils/orderCalculations');
+const getNextSequence = require('../utils/getNextSequence');
 
 function createError(message, statusCode) {
   const error = new Error(message);
   error.statusCode = statusCode;
   return error;
+}
+
+function todayKey() {
+  return new Date().toISOString().slice(0, 10);
 }
 
 async function createOrder(req, res, next) {
@@ -83,6 +89,15 @@ async function createOrder(req, res, next) {
     let order;
 
     await session.withTransaction(async () => {
+      const kotNumber = await getNextSequence({
+        restaurantId: req.restaurantId,
+        branchId: req.branchId,
+        name: 'kot',
+        dateKey: todayKey(),
+        session
+      });
+      orderItems.forEach((item) => { item.kotNumber = kotNumber; });
+
       [order] = await Order.create([{
         orderType,
         tableId: orderType === 'dine-in' ? table._id : undefined,
@@ -149,6 +164,8 @@ async function getOrderById(req, res, next) {
 }
 
 async function addItemsToOrder(req, res, next) {
+  const session = await mongoose.startSession();
+
   try {
     const { items } = req.body;
     if (!Array.isArray(items) || items.length === 0) {
@@ -159,7 +176,7 @@ async function addItemsToOrder(req, res, next) {
       _id: req.params.id,
       restaurantId: req.restaurantId,
       branchId: req.branchId
-    });
+    }).session(session);
     if (!order) throw createError('Order not found', 404);
     if (order.status !== 'open') throw createError('Only open orders can receive new items', 400);
 
@@ -201,14 +218,25 @@ async function addItemsToOrder(req, res, next) {
       };
     });
 
-    order.items.push(...newItems);
-    const totals = calculateOrderTotals(order.items, order.discount);
-    order.set(totals);
-    await order.save();
+    await session.withTransaction(async () => {
+      const kotNumber = await getNextSequence({
+        restaurantId: req.restaurantId,
+        branchId: req.branchId,
+        name: 'kot',
+        dateKey: todayKey(),
+        session
+      });
+      newItems.forEach((item) => { item.kotNumber = kotNumber; });
+      order.items.push(...newItems);
+      const totals = calculateOrderTotals(order.items, order.discount);
+      order.set(totals);
+      await order.save({ session });
+    });
 
     const io = req.app.get('io');
     if (io) io.to(`branch_${req.branchId}`).emit('new-kot', {
       orderId: order._id,
+      kotNumber: newItems[0].kotNumber,
       newItems: order.items.slice(-newItems.length),
       order
     });
@@ -216,6 +244,8 @@ async function addItemsToOrder(req, res, next) {
     res.json({ success: true, data: order, message: 'Items added to order successfully' });
   } catch (error) {
     next(error);
+  } finally {
+    await session.endSession();
   }
 }
 
@@ -287,11 +317,17 @@ async function generateBill(req, res, next) {
   const session = await mongoose.startSession();
 
   try {
+    const { paymentMode } = req.body;
+    if (!['cash', 'card', 'upi'].includes(paymentMode)) {
+      throw createError('A valid payment mode is required: cash, card, or upi', 400);
+    }
+
     const discount = Number(req.body.discount) || 0;
     if (discount < 0) throw createError('Discount cannot be negative', 400);
 
     let order;
     let totals;
+    let bill;
     await session.withTransaction(async () => {
       order = await Order.findOne({
         _id: req.params.id,
@@ -309,6 +345,40 @@ async function generateBill(req, res, next) {
       order.set({ ...totals, discount, status: 'billed' });
       await order.save({ session });
 
+      const billSequence = await getNextSequence({
+        restaurantId: req.restaurantId,
+        branchId: req.branchId,
+        name: 'bill',
+        dateKey: null,
+        session
+      });
+      const billItems = order.items
+        .filter((item) => item.status !== 'cancelled')
+        .map((item) => {
+          const modifierTotal = (item.selectedModifiers || []).reduce(
+            (sum, modifier) => sum + (Number(modifier.priceDelta) || 0),
+            0
+          );
+          return {
+            name: item.name,
+            qty: item.qty,
+            price: item.price,
+            lineTotal: (Number(item.price) + modifierTotal) * Number(item.qty)
+          };
+        });
+
+      [bill] = await Bill.create([{
+        orderId: order._id,
+        billNumber: `INV-${String(billSequence).padStart(6, '0')}`,
+        items: billItems,
+        ...totals,
+        paymentMode,
+        customerPhone: order.customerPhone,
+        billedBy: req.user._id,
+        restaurantId: req.restaurantId,
+        branchId: req.branchId
+      }], { session });
+
       if (order.orderType === 'dine-in' && order.tableId) {
         await Table.updateOne(
           { _id: order.tableId, restaurantId: req.restaurantId, branchId: req.branchId },
@@ -320,7 +390,7 @@ async function generateBill(req, res, next) {
 
     res.json({
       success: true,
-      data: { order, breakdown: totals },
+      data: { order, bill, breakdown: totals },
       message: 'Bill generated successfully'
     });
   } catch (error) {

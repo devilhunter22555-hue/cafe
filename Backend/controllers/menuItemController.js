@@ -62,7 +62,6 @@ async function getMenuItems(req, res, next) {
 
     res.json({ success: true, data: menuItems, message: 'Menu items fetched successfully' });
   } catch (error) {
-    console.error(error);
     next(error);
   }
 }

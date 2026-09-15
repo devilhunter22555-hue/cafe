@@ -41,6 +41,7 @@ function Billing() {
   const [selectedOrder, setSelectedOrder] = useState(null)
   const [billedOrder, setBilledOrder] = useState(null)
   const [discount, setDiscount] = useState('0')
+  const [paymentMode, setPaymentMode] = useState('cash')
   const [error, setError] = useState('')
 
   useEffect(() => {
@@ -61,12 +62,13 @@ function Billing() {
   const selectOrder = (order) => {
     setSelectedOrder(order)
     setDiscount(String(order.discount || 0))
+    setPaymentMode('cash')
     setError('')
   }
 
   const createBill = async () => {
     try {
-      const response = await generateBill(selectedOrder._id, Number(discount) || 0)
+      const response = await generateBill(selectedOrder._id, Number(discount) || 0, paymentMode)
       const order = { ...response.data.data.order, tableId: selectedOrder.tableId }
       setOrders((currentOrders) => currentOrders.filter((currentOrder) => currentOrder._id !== selectedOrder._id))
       setBilledOrder(order)
@@ -96,6 +98,7 @@ function Billing() {
       <div className="flex justify-between text-sm text-gray-600"><span>CGST</span><span>{money(selectedOrder.cgst)}</span></div>
       <div className="flex justify-between text-sm text-gray-600"><span>SGST</span><span>{money(selectedOrder.sgst)}</span></div>
       <label className="mt-3 flex items-center justify-between text-sm text-gray-600">Discount<input className="input-field w-20 text-right" min="0" onChange={(event) => setDiscount(event.target.value)} step="0.01" type="number" value={discount} /></label>
+      <label className="mt-3 flex items-center justify-between text-sm text-gray-600">Payment mode<select className="input-field w-28" onChange={(event) => setPaymentMode(event.target.value)} value={paymentMode}><option value="cash">Cash</option><option value="card">Card</option><option value="upi">UPI</option></select></label>
       <div className="mt-2 flex justify-between border-t pt-2 text-lg font-bold text-secondary"><span>Total</span><span>{money(totalFor(selectedOrder, discount))}</span></div>
       {error && <p className="mt-3 text-sm text-danger">{error}</p>}
       <div className="mt-4 flex gap-2"><button className="btn-primary flex-1" onClick={createBill} type="button">Generate Bill</button><button className="btn-secondary" onClick={() => { setSelectedOrder(null); setError('') }} type="button">Cancel</button></div>

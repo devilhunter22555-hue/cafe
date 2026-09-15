@@ -16,7 +16,11 @@ async function getKitchenOrders(req, res, next) {
       _id: order._id,
       tableNumber: order.tableId ? order.tableId.tableNumber : null,
       orderType: order.orderType,
-      items: order.items.filter((item) => ['pending', 'preparing'].includes(item.status))
+      items: order.items.filter((item) => ['pending', 'preparing'].includes(item.status)),
+      kotNumbers: [...new Set(order.items
+        .filter((item) => ['pending', 'preparing'].includes(item.status))
+        .map((item) => item.kotNumber)
+        .filter(Boolean))]
     }));
 
     res.json({

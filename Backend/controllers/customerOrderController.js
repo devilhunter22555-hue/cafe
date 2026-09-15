@@ -3,11 +3,16 @@ const MenuItem = require('../models/MenuItem');
 const Order = require('../models/Order');
 const Table = require('../models/Table');
 const calculateOrderTotals = require('../utils/orderCalculations');
+const getNextSequence = require('../utils/getNextSequence');
 
 function createError(message, statusCode) {
   const error = new Error(message);
   error.statusCode = statusCode;
   return error;
+}
+
+function todayKey() {
+  return new Date().toISOString().slice(0, 10);
 }
 
 async function snapshotItems(items, restaurantId, branchId, session) {
@@ -75,6 +80,14 @@ async function placeOrder(req, res, next) {
       if (!table) throw createError('Table not found', 404);
 
       newItems = await snapshotItems(req.body.items, restaurantId, branchId, session);
+      const kotNumber = await getNextSequence({
+        restaurantId,
+        branchId,
+        name: 'kot',
+        dateKey: todayKey(),
+        session
+      });
+      newItems.forEach((item) => { item.kotNumber = kotNumber; });
       order = await Order.findOne({
         _id: { $exists: true },
         tableId,
@@ -116,6 +129,7 @@ async function placeOrder(req, res, next) {
       } else {
         io.to(`branch_${branchId}`).emit('new-kot', {
           orderId: order._id,
+          kotNumber: newItems[0].kotNumber,
           newItems: order.items.slice(-newItems.length),
           order
         });
