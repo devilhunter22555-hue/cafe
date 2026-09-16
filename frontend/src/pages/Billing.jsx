@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { Banknote, CreditCard, Smartphone } from 'lucide-react'
 import { generateBill, getOrderById, getOrders } from '../api/orderApi.js'
 import { useAuth } from '../context/AuthContext.jsx'
 
@@ -41,7 +42,7 @@ function Billing() {
   const [selectedOrder, setSelectedOrder] = useState(null)
   const [billedOrder, setBilledOrder] = useState(null)
   const [discount, setDiscount] = useState('0')
-  const [paymentMode, setPaymentMode] = useState('cash')
+  const [paymentMode, setPaymentMode] = useState('')
   const [error, setError] = useState('')
 
   useEffect(() => {
@@ -62,7 +63,7 @@ function Billing() {
   const selectOrder = (order) => {
     setSelectedOrder(order)
     setDiscount(String(order.discount || 0))
-    setPaymentMode('cash')
+    setPaymentMode('')
     setError('')
   }
 
@@ -71,7 +72,7 @@ function Billing() {
       const response = await generateBill(selectedOrder._id, Number(discount) || 0, paymentMode)
       const order = { ...response.data.data.order, tableId: selectedOrder.tableId }
       setOrders((currentOrders) => currentOrders.filter((currentOrder) => currentOrder._id !== selectedOrder._id))
-      setBilledOrder(order)
+      setBilledOrder({ order, bill: response.data.data.bill })
       setSelectedOrder(null)
       setError('')
     } catch (requestError) {
@@ -81,10 +82,11 @@ function Billing() {
 
   if (billedOrder) return <main className="mx-auto max-w-5xl p-6">
     <section className="card mx-auto max-w-md" id="printable-bill">
-      <header className="mb-4 border-b pb-3 text-center"><h1 className="text-lg font-bold">Restaurant POS</h1><p className="mt-1 text-sm text-gray-500">{new Date().toLocaleString()}</p></header>
-      <h2 className="mb-2 text-xl font-bold text-secondary">{orderLabel(billedOrder)}</h2>
-      <BillItems order={billedOrder} />
-      <Totals discount={billedOrder.discount} order={billedOrder} />
+      <header className="mb-4 border-b pb-3 text-center"><h1 className="text-lg font-bold">Restaurant POS</h1><p className="mt-1 text-lg font-bold text-primary">Invoice: {billedOrder.bill.billNumber}</p><p className="mt-1 text-sm text-gray-500">{new Date().toLocaleString()}</p></header>
+      <h2 className="mb-2 text-xl font-bold text-secondary">{orderLabel(billedOrder.order)}</h2>
+      <BillItems order={billedOrder.order} />
+      <Totals discount={billedOrder.order.discount} order={billedOrder.order} />
+      <p className="mt-4 border-t pt-3 text-sm text-gray-600">Payment Mode: <span className="font-semibold uppercase">{billedOrder.bill.paymentMode}</span></p>
       <div className="mt-4 flex gap-2 print:hidden"><button className="btn-primary flex-1" onClick={() => window.print()} type="button">Print Bill</button><button className="btn-secondary" onClick={() => setBilledOrder(null)} type="button">Back to Orders</button></div>
     </section>
   </main>
@@ -98,10 +100,10 @@ function Billing() {
       <div className="flex justify-between text-sm text-gray-600"><span>CGST</span><span>{money(selectedOrder.cgst)}</span></div>
       <div className="flex justify-between text-sm text-gray-600"><span>SGST</span><span>{money(selectedOrder.sgst)}</span></div>
       <label className="mt-3 flex items-center justify-between text-sm text-gray-600">Discount<input className="input-field w-20 text-right" min="0" onChange={(event) => setDiscount(event.target.value)} step="0.01" type="number" value={discount} /></label>
-      <label className="mt-3 flex items-center justify-between text-sm text-gray-600">Payment mode<select className="input-field w-28" onChange={(event) => setPaymentMode(event.target.value)} value={paymentMode}><option value="cash">Cash</option><option value="card">Card</option><option value="upi">UPI</option></select></label>
+      <div className="mt-4"><p className="mb-2 text-sm text-gray-600">Payment Mode</p><div className="flex gap-2">{[['cash', 'Cash', Banknote], ['card', 'Card', CreditCard], ['upi', 'UPI', Smartphone]].map(([value, label, Icon]) => <button className={`flex-1 rounded-lg border py-2 text-sm font-medium ${paymentMode === value ? 'border-primary bg-primary/10 text-primary' : 'border-gray-300 bg-white text-gray-600'}`} key={value} onClick={() => setPaymentMode(value)} type="button"><Icon className="mx-auto mb-1" size={18} />{label}</button>)}</div></div>
       <div className="mt-2 flex justify-between border-t pt-2 text-lg font-bold text-secondary"><span>Total</span><span>{money(totalFor(selectedOrder, discount))}</span></div>
       {error && <p className="mt-3 text-sm text-danger">{error}</p>}
-      <div className="mt-4 flex gap-2"><button className="btn-primary flex-1" onClick={createBill} type="button">Generate Bill</button><button className="btn-secondary" onClick={() => { setSelectedOrder(null); setError('') }} type="button">Cancel</button></div>
+      <div className="mt-4 flex gap-2"><button className="btn-primary flex-1" disabled={!paymentMode} onClick={createBill} type="button">Generate Bill</button><button className="btn-secondary" onClick={() => { setSelectedOrder(null); setError('') }} type="button">Cancel</button></div>
     </section>
   </main>
 

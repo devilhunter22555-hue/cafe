@@ -1,4 +1,4 @@
-import { ChefHat, LayoutGrid, LogOut, Receipt, ShoppingCart, Store, UtensilsCrossed } from 'lucide-react'
+import { ChefHat, FileText, LayoutGrid, LogOut, Receipt, ShoppingCart, Store, UtensilsCrossed } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
 
@@ -11,6 +11,7 @@ function Dashboard() {
     { title: 'New Order', description: 'Start a new customer order.', path: '/dashboard/pos', icon: ShoppingCart },
     { title: 'Kitchen Display', description: 'Keep up with active orders.', path: '/dashboard/kitchen', icon: ChefHat },
     { title: 'Billing', description: 'Review payments and invoices.', path: '/dashboard/billing', icon: Receipt },
+    { title: 'Bill History', description: 'Browse completed bills and payment totals.', path: '/dashboard/bills', icon: FileText },
   ]
 
   return <main className="min-h-screen bg-gray-50">

@@ -8,6 +8,7 @@ import TableManagement from './pages/TableManagement.jsx'
 import POS from './pages/POS.jsx'
 import KitchenDisplay from './pages/KitchenDisplay.jsx'
 import Billing from './pages/Billing.jsx'
+import BillHistory from './pages/BillHistory.jsx'
 
 function App() {
   return <Routes>
@@ -20,6 +21,7 @@ function App() {
       <Route path="/dashboard/pos" element={<POS />} />
       <Route path="/dashboard/kitchen" element={<KitchenDisplay />} />
       <Route path="/dashboard/billing" element={<Billing />} />
+      <Route path="/dashboard/bills" element={<BillHistory />} />
       <Route path="/menu" element={<MenuManagement />} />
       <Route path="/tables" element={<TableManagement />} />
       <Route path="/" element={<Dashboard />} />
