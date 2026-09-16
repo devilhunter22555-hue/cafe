@@ -5,7 +5,9 @@ const billItemSchema = new mongoose.Schema({
   name: { type: String, required: true },
   qty: { type: Number, required: true },
   price: { type: Number, required: true },
-  lineTotal: { type: Number, required: true }
+  lineTotal: { type: Number, required: true },
+  categoryId: { type: mongoose.Schema.Types.ObjectId, ref: 'Category' },
+  categoryName: String
 }, { _id: false });
 
 const billSchema = new mongoose.Schema({

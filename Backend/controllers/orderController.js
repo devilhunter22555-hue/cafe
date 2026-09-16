@@ -333,6 +333,10 @@ async function generateBill(req, res, next) {
         _id: req.params.id,
         restaurantId: req.restaurantId,
         branchId: req.branchId
+      }).populate({
+        path: 'items.menuItemId',
+        select: 'categoryId',
+        populate: { path: 'categoryId', select: 'name' }
       }).session(session);
       if (!order) throw createError('Order not found', 404);
       if (order.status !== 'open') throw createError('Only open orders can be billed', 400);
@@ -363,7 +367,9 @@ async function generateBill(req, res, next) {
             name: item.name,
             qty: item.qty,
             price: item.price,
-            lineTotal: (Number(item.price) + modifierTotal) * Number(item.qty)
+            lineTotal: (Number(item.price) + modifierTotal) * Number(item.qty),
+            categoryId: item.menuItemId?.categoryId?._id || item.menuItemId?.categoryId,
+            categoryName: item.menuItemId?.categoryId?.name
           };
         });
 
@@ -372,6 +378,7 @@ async function generateBill(req, res, next) {
         billNumber: `INV-${String(billSequence).padStart(6, '0')}`,
         items: billItems,
         ...totals,
+        discount,
         paymentMode,
         customerPhone: order.customerPhone,
         billedBy: req.user._id,
