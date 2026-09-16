@@ -10,6 +10,11 @@ const authRoutes = require('./routes/authRoutes');
 const categoryRoutes = require('./routes/categoryRoutes');
 const modifierRoutes = require('./routes/modifierRoutes');
 const menuItemRoutes = require('./routes/menuItemRoutes');
+const tableRoutes = require('./routes/tableRoutes');
+const orderRoutes = require('./routes/orderRoutes');
+const kitchenRoutes = require('./routes/kitchenRoutes');
+const customerAuthRoutes = require('./routes/customerAuthRoutes');
+const customerRoutes = require('./routes/customerRoutes');
 const billRoutes = require('./routes/billRoutes');
 const errorHandler = require('./middleware/errorHandler');
 
@@ -59,6 +64,11 @@ app.use('/api/auth', authRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/modifiers', modifierRoutes);
 app.use('/api/menu-items', menuItemRoutes);
+app.use('/api/tables', tableRoutes);
+app.use('/api/orders', orderRoutes);
+app.use('/api/kitchen', kitchenRoutes);
+app.use('/api/customer', customerAuthRoutes);
+app.use('/api/customer', customerRoutes);
 app.use('/api/bills', billRoutes);
 app.use(errorHandler);
 
