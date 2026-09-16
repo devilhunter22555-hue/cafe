@@ -3,7 +3,7 @@ const tenantPlugin = require('../utils/tenantPlugin');
 
 const stockLogSchema = new mongoose.Schema({
   inventoryItemId: { type: mongoose.Schema.Types.ObjectId, ref: 'InventoryItem', required: true },
-  changeType: { type: String, enum: ['purchase', 'wastage', 'manual_adjustment'], required: true },
+  changeType: { type: String, enum: ['purchase', 'wastage', 'manual_adjustment', 'order_deduction'], required: true },
   quantityChange: { type: Number, required: true },
   previousStock: { type: Number, required: true },
   newStock: { type: Number, required: true },

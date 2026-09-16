@@ -3,6 +3,9 @@ const MenuItem = require('../models/MenuItem');
 const Order = require('../models/Order');
 const Table = require('../models/Table');
 const Bill = require('../models/Bill');
+const Recipe = require('../models/Recipe');
+const InventoryItem = require('../models/InventoryItem');
+const StockLog = require('../models/StockLog');
 const calculateOrderTotals = require('../utils/orderCalculations');
 const getNextSequence = require('../utils/getNextSequence');
 
@@ -14,6 +17,52 @@ function createError(message, statusCode) {
 
 function todayKey() {
   return new Date().toISOString().slice(0, 10);
+}
+
+async function deductInventoryForItems({ items, orderId, restaurantId, branchId, userId, session }) {
+  const menuItemIds = [...new Set(items.map((item) => String(item.menuItemId)))];
+  const recipes = await Recipe.find({
+    menuItemId: { $in: menuItemIds },
+    restaurantId,
+    branchId
+  }).session(session).lean();
+  const recipesByMenuItem = new Map(recipes.map((recipe) => [String(recipe.menuItemId), recipe]));
+  const deductions = new Map();
+
+  items.forEach((item) => {
+    const recipe = recipesByMenuItem.get(String(item.menuItemId));
+    if (!recipe) return;
+    recipe.ingredients.forEach((ingredient) => {
+      const inventoryItemId = String(ingredient.inventoryItemId);
+      const amount = Number(ingredient.quantityPerUnit) * Number(item.qty);
+      deductions.set(inventoryItemId, (deductions.get(inventoryItemId) || 0) + amount);
+    });
+  });
+
+  for (const [inventoryItemId, deduction] of deductions) {
+    const inventoryItem = await InventoryItem.findOne({
+      _id: inventoryItemId,
+      restaurantId,
+      branchId
+    }).session(session);
+    if (!inventoryItem) continue;
+
+    const previousStock = inventoryItem.currentStock;
+    const newStock = previousStock - deduction;
+    inventoryItem.currentStock = newStock;
+    await inventoryItem.save({ session });
+    await StockLog.create([{
+      inventoryItemId: inventoryItem._id,
+      changeType: 'order_deduction',
+      quantityChange: -deduction,
+      previousStock,
+      newStock,
+      note: `Auto-deducted for Order #${orderId}`,
+      createdBy: userId,
+      restaurantId,
+      branchId
+    }], { session });
+  }
 }
 
 async function createOrder(req, res, next) {
@@ -56,6 +105,7 @@ async function createOrder(req, res, next) {
       _id: { $in: menuItemIds },
       restaurantId: req.restaurantId,
       branchId: req.branchId,
+      isActive: true,
       isAvailable: true
     }).session(session);
     const menuItemsById = new Map(menuItems.map((item) => [item._id.toString(), item]));
@@ -112,6 +162,15 @@ async function createOrder(req, res, next) {
         restaurantId: req.restaurantId,
         branchId: req.branchId
       }], { session });
+
+      await deductInventoryForItems({
+        items: orderItems,
+        orderId: order._id,
+        restaurantId: req.restaurantId,
+        branchId: req.branchId,
+        userId: req.user._id,
+        session
+      });
 
       if (orderType === 'dine-in') {
         await Table.updateOne(
@@ -189,8 +248,9 @@ async function addItemsToOrder(req, res, next) {
       _id: { $in: menuItemIds },
       restaurantId: req.restaurantId,
       branchId: req.branchId,
+      isActive: true,
       isAvailable: true
-    });
+    }).session(session);
     const menuItemsById = new Map(menuItems.map((item) => [item._id.toString(), item]));
     const newItems = items.map((item) => {
       const menuItem = menuItemsById.get(item.menuItemId.toString());
@@ -231,6 +291,14 @@ async function addItemsToOrder(req, res, next) {
       const totals = calculateOrderTotals(order.items, order.discount);
       order.set(totals);
       await order.save({ session });
+      await deductInventoryForItems({
+        items: newItems,
+        orderId: order._id,
+        restaurantId: req.restaurantId,
+        branchId: req.branchId,
+        userId: req.user._id,
+        session
+      });
     });
 
     const io = req.app.get('io');
