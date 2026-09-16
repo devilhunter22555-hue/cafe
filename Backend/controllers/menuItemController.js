@@ -49,7 +49,7 @@ async function getMenuItems(req, res, next) {
     const filter = {
       restaurantId: req.restaurantId,
       branchId: req.branchId,
-      isAvailable: true
+      isActive: true
     };
     if (req.query.categoryId) {
       if (!mongoose.isValidObjectId(req.query.categoryId)) throw createError('Invalid categoryId', 400);
@@ -114,7 +114,7 @@ async function deleteMenuItem(req, res, next) {
   try {
     const menuItem = await MenuItem.findOneAndUpdate(
       { _id: req.params.id, restaurantId: req.restaurantId, branchId: req.branchId },
-      { $set: { isAvailable: false } },
+      { $set: { isActive: false } },
       { new: true, runValidators: true }
     );
     if (!menuItem) throw createError('Menu item not found', 404);
