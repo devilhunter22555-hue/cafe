@@ -394,6 +394,7 @@ async function generateBill(req, res, next) {
       message: 'Bill generated successfully'
     });
   } catch (error) {
+    console.error(error);
     next(error);
   } finally {
     await session.endSession();

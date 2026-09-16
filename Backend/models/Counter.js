@@ -4,7 +4,7 @@ const counterSchema = new mongoose.Schema({
   restaurantId: { type: mongoose.Schema.Types.ObjectId, ref: 'Restaurant', required: true },
   branchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch', required: true },
   name: { type: String, required: true },
-  dateKey: { type: String, default: null },
+  dateKey: { type: String, default: 'all-time' },
   value: { type: Number, default: 0 }
 });
 
