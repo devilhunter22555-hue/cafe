@@ -19,6 +19,7 @@ const billRoutes = require('./routes/billRoutes');
 const reportRoutes = require('./routes/reportRoutes');
 const inventoryRoutes = require('./routes/inventoryRoutes');
 const recipeRoutes = require('./routes/recipeRoutes');
+const staffRoutes = require('./routes/staffRoutes');
 const errorHandler = require('./middleware/errorHandler');
 
 const requiredEnvVars = ['MONGO_URI', 'JWT_ACCESS_SECRET', 'JWT_REFRESH_SECRET'];
@@ -76,6 +77,7 @@ app.use('/api/bills', billRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/inventory', inventoryRoutes);
 app.use('/api/recipes', recipeRoutes);
+app.use('/api/staff', staffRoutes);
 app.use(errorHandler);
 
 const port = process.env.PORT || 5000;
