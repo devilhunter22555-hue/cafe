@@ -1,4 +1,4 @@
-import { ChefHat, ClipboardList, FileText, LayoutGrid, LogOut, Package, Receipt, ShoppingCart, Store, TrendingUp, Truck, Users, UtensilsCrossed } from 'lucide-react'
+import { ChefHat, ClipboardList, FileText, LayoutGrid, Lightbulb, LogOut, Package, Receipt, ShoppingCart, Store, TrendingUp, Truck, Users, UtensilsCrossed } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
 
@@ -16,6 +16,7 @@ function Dashboard() {
     ...(user?.role === 'owner' || user?.role === 'manager' ? [{ title: 'Suppliers', description: 'Manage supplier records and contacts.', path: '/dashboard/suppliers', icon: Truck }] : []),
     ...(user?.role === 'owner' || user?.role === 'manager' ? [{ title: 'Purchase Orders', description: 'Track stock purchases and deliveries.', path: '/dashboard/purchase-orders', icon: ClipboardList }] : []),
     ...(user?.role === 'owner' || user?.role === 'manager' ? [{ title: 'Analytics', description: 'Track revenue, trends, and top sellers.', path: '/dashboard/analytics', icon: TrendingUp }] : []),
+    ...(user?.role === 'owner' || user?.role === 'manager' ? [{ title: 'Insights', description: 'Monitor food cost and price signals.', path: '/dashboard/insights', icon: Lightbulb }] : []),
     ...(user?.role === 'owner' || user?.role === 'manager' || user?.role === 'cashier' ? [{ title: 'Inventory', description: 'Track stock levels and adjustments.', path: '/dashboard/inventory', icon: Package }] : []),
   ]
 
