@@ -12,6 +12,8 @@ import BillHistory from './pages/BillHistory.jsx'
 import Analytics from './pages/Analytics.jsx'
 import Inventory from './pages/Inventory.jsx'
 import StaffManagement from './pages/StaffManagement.jsx'
+import Suppliers from './pages/Suppliers.jsx'
+import PurchaseOrders from './pages/PurchaseOrders.jsx'
 
 function App() {
   return <Routes>
@@ -28,6 +30,8 @@ function App() {
       <Route path="/dashboard/analytics" element={<Analytics />} />
       <Route path="/dashboard/inventory" element={<Inventory />} />
       <Route path="/dashboard/staff" element={<StaffManagement />} />
+      <Route path="/dashboard/suppliers" element={<Suppliers />} />
+      <Route path="/dashboard/purchase-orders" element={<PurchaseOrders />} />
       <Route path="/menu" element={<MenuManagement />} />
       <Route path="/tables" element={<TableManagement />} />
       <Route path="/" element={<Dashboard />} />
