@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, CheckCircle2, TrendingDown, TrendingUp } from 'lucide-react'
-import { getFoodCostSummary, getLowStockForecast, getPriceTrends } from '../api/insightsApi.js'
+import { AlertTriangle, CheckCircle2, Sparkles, TrendingDown, TrendingUp } from 'lucide-react'
+import { getAISummary, getFoodCostSummary, getLowStockForecast, getPriceTrends } from '../api/insightsApi.js'
 import { useAuth } from '../context/AuthContext.jsx'
 
 const currency = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 })
@@ -29,6 +29,8 @@ function Insights() {
   const [foodCostSummary, setFoodCostSummary] = useState(null)
   const [priceTrends, setPriceTrends] = useState([])
   const [lowStockItems, setLowStockItems] = useState([])
+  const [aiSummary, setAiSummary] = useState(null)
+  const [aiLoading, setAiLoading] = useState(true)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -39,11 +41,13 @@ function Insights() {
 
     const loadData = async () => {
       setLoading(true)
+      setAiLoading(true)
       try {
-        const [foodResponse, priceResponse, lowStockResponse] = await Promise.all([
+        const [foodResponse, priceResponse, lowStockResponse, aiResponse] = await Promise.all([
           getFoodCostSummary(range.from, range.to),
           getPriceTrends(30),
-          getLowStockForecast()
+          getLowStockForecast(),
+          getAISummary(range.from, range.to)
         ])
 
         if (!active) return
@@ -51,13 +55,18 @@ function Insights() {
         setFoodCostSummary(foodResponse.data?.data || null)
         setPriceTrends(priceResponse.data?.data || [])
         setLowStockItems(lowStockResponse.data?.data || [])
+        setAiSummary(aiResponse.data?.data?.summary || null)
         setError('')
       } catch (requestError) {
         if (active) {
           setError(requestError.response?.data?.message || 'Unable to load insights')
+          setAiSummary(null)
         }
       } finally {
-        if (active) setLoading(false)
+        if (active) {
+          setLoading(false)
+          setAiLoading(false)
+        }
       }
     }
 
@@ -111,6 +120,25 @@ function Insights() {
     <main className="mx-auto max-w-6xl p-6">
       <h1 className="mb-2 text-2xl font-bold text-secondary">Insights</h1>
       <p className="mb-6 text-gray-500">Understand what's driving your numbers</p>
+
+      <section className="mb-6 rounded-xl border border-primary/20 bg-gradient-to-r from-primary/5 to-transparent p-5">
+        <div className="mb-2 flex items-center gap-2">
+          <Sparkles className="text-primary" size={18} />
+          <span className="text-sm font-semibold uppercase tracking-wide text-primary">AI Summary</span>
+        </div>
+
+        {aiLoading ? (
+          <div className="space-y-2 pt-1">
+            <div className="h-3 w-full animate-pulse rounded bg-gray-200" />
+            <div className="h-3 w-5/6 animate-pulse rounded bg-gray-200" />
+            <div className="h-3 w-2/3 animate-pulse rounded bg-gray-200" />
+          </div>
+        ) : aiSummary ? (
+          <p className="text-base leading-relaxed text-secondary">{aiSummary}</p>
+        ) : (
+          <p className="text-sm text-gray-400">Not enough data yet for a summary — check back after a few more orders and purchases</p>
+        )}
+      </section>
 
       <section className="card mb-6 p-6">
         <div className="mb-4 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
