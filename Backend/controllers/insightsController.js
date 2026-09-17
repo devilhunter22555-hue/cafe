@@ -306,8 +306,17 @@ async function buildLowStockContext(restaurantId, branchId) {
   return inventoryItems
     .map((inventoryItem) => {
       const relevantLogs = logsByInventoryId.get(String(inventoryItem._id)) || [];
+
+      if (!relevantLogs.length) {
+        return null;
+      }
+
       const totalReduction = relevantLogs.reduce((sum, log) => sum + Math.abs(Number(log.quantityChange) || 0), 0);
-      const avgDailyConsumption = totalReduction / 7;
+      const earliestDate = new Date(Math.min(...relevantLogs.map((log) => new Date(log.createdAt).getTime())));
+      const now = new Date();
+      const msPerDay = 24 * 60 * 60 * 1000;
+      const daysWithData = Math.max(1, Math.ceil((now.getTime() - earliestDate.getTime()) / msPerDay) + 1);
+      const avgDailyConsumption = totalReduction / daysWithData;
 
       if (avgDailyConsumption <= 0) {
         return null;
@@ -324,7 +333,8 @@ async function buildLowStockContext(restaurantId, branchId) {
         currentStock: inventoryItem.currentStock,
         unit: inventoryItem.unit,
         avgDailyConsumption,
-        estimatedDaysRemaining
+        estimatedDaysRemaining,
+        daysWithData
       };
     })
     .filter(Boolean)
