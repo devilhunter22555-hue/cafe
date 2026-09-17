@@ -89,8 +89,17 @@ async function login(req, res, next) {
     }
 
     const user = await User.findOne({ email }).select('+password');
-    if (!user || !user.isActive || !(await user.comparePassword(password))) {
+    if (!user) {
       throw createError('Invalid credentials', 401);
+    }
+
+    const isPasswordValid = await user.comparePassword(password);
+    if (!isPasswordValid) {
+      throw createError('Invalid credentials', 401);
+    }
+
+    if (user.isActive === false) {
+      throw createError('Account has been deactivated. Contact your restaurant owner.', 403);
     }
 
     const accessToken = generateAccessToken(authPayload(user));
@@ -115,8 +124,12 @@ async function refreshToken(req, res, next) {
 
     const decoded = jwt.verify(token, process.env.JWT_REFRESH_SECRET);
     const user = await User.findById(decoded.userId);
-    if (!user || !user.isActive) {
-      throw createError('User not found or inactive', 401);
+    if (!user) {
+      throw createError('User not found', 401);
+    }
+
+    if (user.isActive === false) {
+      throw createError('Account has been deactivated. Contact your restaurant owner.', 403);
     }
 
     const accessToken = generateAccessToken(authPayload(user));
