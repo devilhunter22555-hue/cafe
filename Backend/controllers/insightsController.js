@@ -4,6 +4,7 @@ const PurchaseOrder = require('../models/PurchaseOrder');
 const Recipe = require('../models/Recipe');
 const Order = require('../models/Order');
 const StockLog = require('../models/StockLog');
+const { generateInsightSummary } = require('../utils/geminiClient');
 
 function createError(message, statusCode) {
   const error = new Error(message);
@@ -190,66 +191,150 @@ async function calculateFoodCostWindow(restaurantId, branchId, fromDate, toDate)
   });
 }
 
+async function buildPriceTrendsContext(restaurantId, branchId, days = 30) {
+  const lookbackDays = Number.isFinite(days) && days > 0 ? days : 30;
+  const fromDate = new Date();
+  fromDate.setDate(fromDate.getDate() - lookbackDays);
+
+  const inventoryItems = await InventoryItem.find({
+    restaurantId,
+    branchId,
+    isActive: true
+  }).lean();
+
+  const purchaseOrders = await PurchaseOrder.find({
+    restaurantId,
+    branchId,
+    status: 'received',
+    createdAt: { $gte: fromDate }
+  }).lean();
+
+  return inventoryItems
+    .map((inventoryItem) => {
+      const itemPurchases = [];
+
+      purchaseOrders.forEach((order) => {
+        (order.items || []).forEach((orderItem) => {
+          const itemId = String(orderItem.inventoryItemId);
+          if (String(inventoryItem._id) !== itemId) {
+            return;
+          }
+
+          itemPurchases.push({
+            unitPrice: Number(orderItem.unitPrice) || 0,
+            purchasedAt: new Date(order.receivedAt || order.createdAt)
+          });
+        });
+      });
+
+      itemPurchases.sort((first, second) => new Date(first.purchasedAt) - new Date(second.purchasedAt));
+
+      if (itemPurchases.length < 2) {
+        return null;
+      }
+
+      const currentPrice = itemPurchases[itemPurchases.length - 1].unitPrice;
+      const previousPrice = itemPurchases[itemPurchases.length - 2].unitPrice;
+      const percentChange = safePercentChange(currentPrice, previousPrice);
+
+      return {
+        inventoryItemId: inventoryItem._id,
+        name: inventoryItem.name,
+        unit: inventoryItem.unit,
+        currentPrice,
+        previousPrice,
+        percentChange,
+        lastPurchasedAt: itemPurchases[itemPurchases.length - 1].purchasedAt
+      };
+    })
+    .filter(Boolean)
+    .sort((first, second) => Math.abs(second.percentChange) - Math.abs(first.percentChange));
+}
+
+async function buildFoodCostSummaryContext(restaurantId, branchId, fromDate, toDate) {
+  const currentSummary = await calculateFoodCostWindow(restaurantId, branchId, fromDate, toDate);
+  const rangeLength = toDate.getTime() - fromDate.getTime();
+  const previousFrom = new Date(fromDate.getTime() - rangeLength);
+  const previousTo = new Date(toDate.getTime() - rangeLength);
+
+  const previousSummary = await calculateFoodCostWindow(
+    restaurantId,
+    branchId,
+    previousFrom,
+    previousTo
+  );
+
+  const previousFoodCostPercentage = Number(previousSummary.foodCostPercentage || 0);
+  const comparisonToPreviousPeriod = previousFoodCostPercentage === 0
+    ? 0
+    : safePercentChange(currentSummary.foodCostPercentage, previousFoodCostPercentage);
+
+  return {
+    totalRevenue: currentSummary.totalRevenue,
+    estimatedFoodCost: currentSummary.estimatedFoodCost,
+    foodCostPercentage: currentSummary.foodCostPercentage,
+    comparisonToPreviousPeriod,
+    itemsWithUnknownCost: currentSummary.itemsWithUnknownCost
+  };
+}
+
+async function buildLowStockContext(restaurantId, branchId) {
+  const inventoryItems = await InventoryItem.find({
+    restaurantId,
+    branchId,
+    isActive: true
+  }).lean();
+
+  const sevenDaysAgo = new Date();
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+  const stockLogs = await StockLog.find({
+    restaurantId,
+    branchId,
+    changeType: 'order_deduction',
+    createdAt: { $gte: sevenDaysAgo }
+  }).lean();
+
+  const logsByInventoryId = new Map();
+  stockLogs.forEach((log) => {
+    const key = String(log.inventoryItemId);
+    const existing = logsByInventoryId.get(key) || [];
+    existing.push(log);
+    logsByInventoryId.set(key, existing);
+  });
+
+  return inventoryItems
+    .map((inventoryItem) => {
+      const relevantLogs = logsByInventoryId.get(String(inventoryItem._id)) || [];
+      const totalReduction = relevantLogs.reduce((sum, log) => sum + Math.abs(Number(log.quantityChange) || 0), 0);
+      const avgDailyConsumption = totalReduction / 7;
+
+      if (avgDailyConsumption <= 0) {
+        return null;
+      }
+
+      const estimatedDaysRemaining = inventoryItem.currentStock / avgDailyConsumption;
+
+      if (estimatedDaysRemaining >= 3) {
+        return null;
+      }
+
+      return {
+        name: inventoryItem.name,
+        currentStock: inventoryItem.currentStock,
+        unit: inventoryItem.unit,
+        avgDailyConsumption,
+        estimatedDaysRemaining
+      };
+    })
+    .filter(Boolean)
+    .sort((first, second) => first.estimatedDaysRemaining - second.estimatedDaysRemaining);
+}
+
 async function getPriceTrends(req, res, next) {
   try {
     const days = Number(req.query.days ?? 30);
-    const lookbackDays = Number.isFinite(days) && days > 0 ? days : 30;
-    const fromDate = new Date();
-    fromDate.setDate(fromDate.getDate() - lookbackDays);
-
-    const inventoryItems = await InventoryItem.find({
-      restaurantId: req.restaurantId,
-      branchId: req.branchId,
-      isActive: true
-    }).lean();
-
-    const purchaseOrders = await PurchaseOrder.find({
-      restaurantId: req.restaurantId,
-      branchId: req.branchId,
-      status: 'received',
-      createdAt: { $gte: fromDate }
-    }).lean();
-
-    const trends = inventoryItems
-      .map((inventoryItem) => {
-        const itemPurchases = [];
-
-        purchaseOrders.forEach((order) => {
-          (order.items || []).forEach((orderItem) => {
-            const itemId = String(orderItem.inventoryItemId);
-            if (String(inventoryItem._id) !== itemId) {
-              return;
-            }
-
-            itemPurchases.push({
-              unitPrice: Number(orderItem.unitPrice) || 0,
-              purchasedAt: new Date(order.receivedAt || order.createdAt)
-            });
-          });
-        });
-
-        itemPurchases.sort((first, second) => new Date(first.purchasedAt) - new Date(second.purchasedAt));
-
-        if (itemPurchases.length < 2) {
-          return null;
-        }
-
-        const currentPrice = itemPurchases[itemPurchases.length - 1].unitPrice;
-        const previousPrice = itemPurchases[itemPurchases.length - 2].unitPrice;
-        const percentChange = safePercentChange(currentPrice, previousPrice);
-
-        return {
-          inventoryItemId: inventoryItem._id,
-          name: inventoryItem.name,
-          unit: inventoryItem.unit,
-          currentPrice,
-          previousPrice,
-          percentChange,
-          lastPurchasedAt: itemPurchases[itemPurchases.length - 1].purchasedAt
-        };
-      })
-      .filter(Boolean)
-      .sort((first, second) => Math.abs(second.percentChange) - Math.abs(first.percentChange));
+    const trends = await buildPriceTrendsContext(req.restaurantId, req.branchId, days);
 
     res.json({
       success: true,
@@ -270,36 +355,19 @@ async function getFoodCostSummary(req, res, next) {
       throw createError('The to date must be after the from date', 400);
     }
 
-    const currentSummary = await calculateFoodCostWindow(req.restaurantId, req.branchId, fromDate, toDate);
-    const rangeLength = toDate.getTime() - fromDate.getTime();
-    const previousFrom = new Date(fromDate.getTime() - rangeLength);
-    const previousTo = new Date(toDate.getTime() - rangeLength);
-
-    const previousSummary = await calculateFoodCostWindow(
-      req.restaurantId,
-      req.branchId,
-      previousFrom,
-      previousTo
-    );
-
-    const previousFoodCostPercentage = Number(previousSummary.foodCostPercentage || 0);
-    const comparisonToPreviousPeriod = previousFoodCostPercentage === 0
-      ? 0
-      : safePercentChange(currentSummary.foodCostPercentage, previousFoodCostPercentage);
+    const summary = await buildFoodCostSummaryContext(req.restaurantId, req.branchId, fromDate, toDate);
 
     const responsePayload = {
       success: true,
       data: {
-        totalRevenue: currentSummary.totalRevenue,
-        estimatedFoodCost: currentSummary.estimatedFoodCost,
-        foodCostPercentage: currentSummary.foodCostPercentage,
-        comparisonToPreviousPeriod,
-        itemsWithUnknownCost: currentSummary.itemsWithUnknownCost
+        totalRevenue: summary.totalRevenue,
+        estimatedFoodCost: summary.estimatedFoodCost,
+        foodCostPercentage: summary.foodCostPercentage,
+        comparisonToPreviousPeriod: summary.comparisonToPreviousPeriod,
+        itemsWithUnknownCost: summary.itemsWithUnknownCost
       },
       message: 'Food cost summary fetched successfully'
     };
-
-    console.log('DEBUG getFoodCostSummary response:', JSON.stringify(responsePayload, null, 2));
 
     res.json(responsePayload);
   } catch (error) {
@@ -309,56 +377,7 @@ async function getFoodCostSummary(req, res, next) {
 
 async function getLowStockForecast(req, res, next) {
   try {
-    const inventoryItems = await InventoryItem.find({
-      restaurantId: req.restaurantId,
-      branchId: req.branchId,
-      isActive: true
-    }).lean();
-
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-
-    const stockLogs = await StockLog.find({
-      restaurantId: req.restaurantId,
-      branchId: req.branchId,
-      changeType: 'order_deduction',
-      createdAt: { $gte: sevenDaysAgo }
-    }).lean();
-
-    const logsByInventoryId = new Map();
-    stockLogs.forEach((log) => {
-      const key = String(log.inventoryItemId);
-      const existing = logsByInventoryId.get(key) || [];
-      existing.push(log);
-      logsByInventoryId.set(key, existing);
-    });
-
-    const flaggedItems = inventoryItems
-      .map((inventoryItem) => {
-        const relevantLogs = logsByInventoryId.get(String(inventoryItem._id)) || [];
-        const totalReduction = relevantLogs.reduce((sum, log) => sum + Math.abs(Number(log.quantityChange) || 0), 0);
-        const avgDailyConsumption = totalReduction / 7;
-
-        if (avgDailyConsumption <= 0) {
-          return null;
-        }
-
-        const estimatedDaysRemaining = inventoryItem.currentStock / avgDailyConsumption;
-
-        if (estimatedDaysRemaining >= 3) {
-          return null;
-        }
-
-        return {
-          name: inventoryItem.name,
-          currentStock: inventoryItem.currentStock,
-          unit: inventoryItem.unit,
-          avgDailyConsumption,
-          estimatedDaysRemaining
-        };
-      })
-      .filter(Boolean)
-      .sort((first, second) => first.estimatedDaysRemaining - second.estimatedDaysRemaining);
+    const flaggedItems = await buildLowStockContext(req.restaurantId, req.branchId);
 
     res.json({
       success: true,
@@ -370,8 +389,45 @@ async function getLowStockForecast(req, res, next) {
   }
 }
 
+async function getAISummary(req, res, next) {
+  try {
+    const fromDate = parseDate(req.query.from, 'from');
+    const toDate = parseDate(req.query.to, 'to');
+
+    if (toDate < fromDate) {
+      throw createError('The to date must be after the from date', 400);
+    }
+
+    const foodCost = await buildFoodCostSummaryContext(req.restaurantId, req.branchId, fromDate, toDate);
+    const priceTrends = await buildPriceTrendsContext(req.restaurantId, req.branchId, 30);
+    const lowStock = await buildLowStockContext(req.restaurantId, req.branchId);
+
+    const summary = await generateInsightSummary({
+      foodCost,
+      priceTrends,
+      lowStock
+    });
+
+    res.json({
+      success: true,
+      data: {
+        summary,
+        rawData: {
+          foodCost,
+          priceTrends,
+          lowStock
+        }
+      },
+      message: 'AI summary generated successfully'
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
 module.exports = {
   getPriceTrends,
   getFoodCostSummary,
-  getLowStockForecast
+  getLowStockForecast,
+  getAISummary
 };
