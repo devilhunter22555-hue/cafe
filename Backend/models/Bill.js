@@ -20,7 +20,10 @@ const billSchema = new mongoose.Schema({
   discount: { type: Number, required: true },
   total: { type: Number, required: true },
   paymentMode: { type: String, enum: ['cash', 'card', 'upi'], required: true },
+  customerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Customer' },
   customerPhone: String,
+  loyaltyPointsEarned: { type: Number, default: 0 },
+  loyaltyPointsRedeemed: { type: Number, default: 0 },
   billedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
 }, { timestamps: true });
 

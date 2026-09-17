@@ -3,9 +3,11 @@ const MenuItem = require('../models/MenuItem');
 const Order = require('../models/Order');
 const Table = require('../models/Table');
 const Bill = require('../models/Bill');
+const Category = require('../models/Category');
 const Recipe = require('../models/Recipe');
 const InventoryItem = require('../models/InventoryItem');
 const StockLog = require('../models/StockLog');
+const Customer = require('../models/Customer');
 const calculateOrderTotals = require('../utils/orderCalculations');
 const getNextSequence = require('../utils/getNextSequence');
 
@@ -390,12 +392,16 @@ async function generateBill(req, res, next) {
       throw createError('A valid payment mode is required: cash, card, or upi', 400);
     }
 
-    const discount = Number(req.body.discount) || 0;
-    if (discount < 0) throw createError('Discount cannot be negative', 400);
+    const baseDiscount = Number(req.body.discount) || 0;
+    if (baseDiscount < 0) throw createError('Discount cannot be negative', 400);
 
     let order;
     let totals;
     let bill;
+    let customer = null;
+    let loyaltyPointsEarned = 0;
+    let loyaltyPointsRedeemed = 0;
+
     await session.withTransaction(async () => {
       order = await Order.findOne({
         _id: req.params.id,
@@ -413,8 +419,45 @@ async function generateBill(req, res, next) {
         throw createError('Cannot bill an order with no active items', 400);
       }
 
-      totals = calculateOrderTotals(order.items, discount);
-      order.set({ ...totals, discount, status: 'billed' });
+      const requestedPhone = req.body.customerPhone ? String(req.body.customerPhone).trim() : '';
+      const resolvedPhone = requestedPhone || (order.customerPhone ? String(order.customerPhone).trim() : '');
+
+      if (resolvedPhone) {
+        customer = await Customer.findOneAndUpdate(
+          { phone: resolvedPhone, restaurantId: req.restaurantId },
+          {
+            $setOnInsert: {
+              phone: resolvedPhone,
+              restaurantId: req.restaurantId,
+              loyaltyPoints: 0,
+              totalSpend: 0,
+              totalOrders: 0,
+              lastVisitAt: new Date()
+            }
+          },
+          { upsert: true, new: true, setDefaultsOnInsert: true, session }
+        );
+      }
+
+      const redeemPointsRequested = Number(req.body.redeemPoints) || 0;
+      if (redeemPointsRequested < 0) {
+        throw createError('Loyalty points to redeem cannot be negative', 400);
+      }
+
+      let redemptionDiscount = 0;
+      if (customer && redeemPointsRequested > 0) {
+        if (customer.loyaltyPoints < redeemPointsRequested) {
+          throw createError('Customer does not have enough loyalty points to redeem that amount', 400);
+        }
+        redemptionDiscount = redeemPointsRequested * 1;
+        loyaltyPointsRedeemed = redeemPointsRequested;
+      }
+
+      const finalDiscount = baseDiscount + redemptionDiscount;
+      totals = calculateOrderTotals(order.items, finalDiscount);
+      loyaltyPointsEarned = Math.floor(totals.total / 100);
+
+      order.set({ ...totals, discount: finalDiscount, status: 'billed' });
       await order.save({ session });
 
       const billSequence = await getNextSequence({
@@ -446,13 +489,33 @@ async function generateBill(req, res, next) {
         billNumber: `INV-${String(billSequence).padStart(6, '0')}`,
         items: billItems,
         ...totals,
-        discount,
+        discount: finalDiscount,
         paymentMode,
-        customerPhone: order.customerPhone,
+        customerId: customer?._id || undefined,
+        customerPhone: resolvedPhone || order.customerPhone,
+        loyaltyPointsEarned,
+        loyaltyPointsRedeemed,
         billedBy: req.user.userId,
         restaurantId: req.restaurantId,
         branchId: req.branchId
       }], { session });
+
+      if (customer) {
+        await Customer.updateOne(
+          { _id: customer._id, restaurantId: req.restaurantId },
+          {
+            $inc: {
+              totalSpend: totals.total,
+              totalOrders: 1,
+              loyaltyPoints: loyaltyPointsEarned - loyaltyPointsRedeemed
+            },
+            $set: {
+              lastVisitAt: new Date()
+            }
+          },
+          { session }
+        );
+      }
 
       if (order.orderType === 'dine-in' && order.tableId) {
         await Table.updateOne(
@@ -465,7 +528,7 @@ async function generateBill(req, res, next) {
 
     res.json({
       success: true,
-      data: { order, bill, breakdown: totals },
+      data: { order, bill, breakdown: totals, customer, loyaltyPointsEarned, loyaltyPointsRedeemed },
       message: 'Bill generated successfully'
     });
   } catch (error) {
