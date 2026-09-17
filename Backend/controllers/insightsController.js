@@ -132,6 +132,13 @@ async function calculateFoodCostWindow(restaurantId, branchId, fromDate, toDate)
   let estimatedFoodCost = 0;
   const itemsWithUnknownCost = [];
 
+  const addUnknownCostItem = (name, reason) => {
+    const key = `${name}|${reason}`;
+    if (!itemsWithUnknownCost.some((item) => `${item.name}|${item.reason || ''}` === key)) {
+      itemsWithUnknownCost.push({ name, reason });
+    }
+  };
+
   bills.forEach((bill) => {
     totalRevenue += toNumber(bill.total);
 
@@ -145,11 +152,13 @@ async function calculateFoodCostWindow(restaurantId, branchId, fromDate, toDate)
 
       const menuItemId = matchedOrderItem?.menuItemId;
       if (!menuItemId) {
+        addUnknownCostItem(billItem.name || 'Unknown item', 'No recipe is linked to this billed item yet');
         return;
       }
 
       const recipe = recipeByMenuItemId.get(String(menuItemId));
       if (!recipe) {
+        addUnknownCostItem(billItem.name || 'Unknown item', 'No recipe exists for this billed item');
         return;
       }
 
@@ -159,10 +168,10 @@ async function calculateFoodCostWindow(restaurantId, branchId, fromDate, toDate)
 
         if (!latestPriceEntry || !latestPriceEntry.unitPrice) {
           const inventoryItem = inventoryById.get(inventoryItemId);
-          itemsWithUnknownCost.push({
-            inventoryItemId,
-            name: inventoryItem?.name || 'Unknown inventory item'
-          });
+          addUnknownCostItem(
+            inventoryItem?.name || 'Unknown inventory item',
+            'No purchase price history recorded for this ingredient yet'
+          );
           return;
         }
 
@@ -278,7 +287,7 @@ async function getFoodCostSummary(req, res, next) {
       ? 0
       : safePercentChange(currentSummary.foodCostPercentage, previousFoodCostPercentage);
 
-    res.json({
+    const responsePayload = {
       success: true,
       data: {
         totalRevenue: currentSummary.totalRevenue,
@@ -288,7 +297,11 @@ async function getFoodCostSummary(req, res, next) {
         itemsWithUnknownCost: currentSummary.itemsWithUnknownCost
       },
       message: 'Food cost summary fetched successfully'
-    });
+    };
+
+    console.log('DEBUG getFoodCostSummary response:', JSON.stringify(responsePayload, null, 2));
+
+    res.json(responsePayload);
   } catch (error) {
     next(error);
   }

@@ -110,7 +110,7 @@ async function adjustStock(req, res, next) {
         previousStock,
         newStock,
         note,
-        createdBy: req.user._id,
+        createdBy: req.user.userId,
         restaurantId: req.restaurantId,
         branchId: req.branchId
       }], { session });

@@ -83,6 +83,14 @@ function Insights() {
     return 'text-danger'
   }, [foodCostSummary])
 
+  const missingFoodCostData =
+    (Number(foodCostSummary?.estimatedFoodCost) || 0) === 0 &&
+    ((foodCostSummary?.itemsWithUnknownCost || []).length > 0 || !foodCostSummary)
+
+  const foodCostDisplayText = missingFoodCostData
+    ? 'Not enough recipe/pricing data yet'
+    : `${Number(foodCostSummary?.foodCostPercentage || 0).toFixed(1)}%`
+
   const foodCostComparison = Number(foodCostSummary?.comparisonToPreviousPeriod) || 0
   const comparisonTone = foodCostComparison <= 0 ? 'text-success' : 'text-danger'
   const comparisonIcon = foodCostComparison <= 0 ? TrendingDown : TrendingUp
@@ -155,15 +163,17 @@ function Insights() {
           <>
             <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
               <div>
-                <div className={`text-4xl font-bold ${foodCostColor}`}>
-                  {Number(foodCostSummary?.foodCostPercentage || 0).toFixed(1)}%
+                <div className={`text-4xl font-bold ${missingFoodCostData ? 'text-gray-500' : foodCostColor}`}>
+                  {foodCostDisplayText}
                 </div>
               </div>
 
-              <div className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-sm font-medium ${comparisonTone === 'text-success' ? 'bg-green-50 text-success' : 'bg-red-50 text-danger'}`}>
-                {comparisonIcon === TrendingDown ? <TrendingDown size={15} /> : <TrendingUp size={15} />}
-                {comparisonLabel}
-              </div>
+              {!missingFoodCostData && (
+                <div className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-sm font-medium ${comparisonTone === 'text-success' ? 'bg-green-50 text-success' : 'bg-red-50 text-danger'}`}>
+                  {comparisonIcon === TrendingDown ? <TrendingDown size={15} /> : <TrendingUp size={15} />}
+                  {comparisonLabel}
+                </div>
+              )}
             </div>
 
             <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -180,11 +190,14 @@ function Insights() {
             {(foodCostSummary?.itemsWithUnknownCost || []).length > 0 && (
               <div className="mt-4 rounded border border-amber-200 bg-amber-50 p-3 text-gray-700">
                 <p className="text-xs text-gray-500">
-                  Some items don't have purchase price history yet, so this estimate may be incomplete
+                  Some billed items are missing recipe or ingredient pricing data, so this estimate may be incomplete.
                 </p>
                 <ul className="mt-2 list-disc pl-5 text-xs text-gray-500">
                   {(foodCostSummary.itemsWithUnknownCost || []).map((item) => (
-                    <li key={item.inventoryItemId || item.name}>{item.name}</li>
+                    <li key={`${item.name}-${item.reason || 'reason'}`}>
+                      {item.name}
+                      {item.reason ? ` — ${item.reason}` : ''}
+                    </li>
                   ))}
                 </ul>
               </div>

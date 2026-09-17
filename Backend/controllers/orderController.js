@@ -158,7 +158,7 @@ async function createOrder(req, res, next) {
         discount,
         total: totals.total,
         source: 'staff',
-        createdBy: req.user._id,
+        createdBy: req.user.userId,
         restaurantId: req.restaurantId,
         branchId: req.branchId
       }], { session });
@@ -168,7 +168,7 @@ async function createOrder(req, res, next) {
         orderId: order._id,
         restaurantId: req.restaurantId,
         branchId: req.branchId,
-        userId: req.user._id,
+        userId: req.user.userId,
         session
       });
 
@@ -296,7 +296,7 @@ async function addItemsToOrder(req, res, next) {
         orderId: order._id,
         restaurantId: req.restaurantId,
         branchId: req.branchId,
-        userId: req.user._id,
+        userId: req.user.userId,
         session
       });
     });
@@ -449,7 +449,7 @@ async function generateBill(req, res, next) {
         discount,
         paymentMode,
         customerPhone: order.customerPhone,
-        billedBy: req.user._id,
+        billedBy: req.user.userId,
         restaurantId: req.restaurantId,
         branchId: req.branchId
       }], { session });
