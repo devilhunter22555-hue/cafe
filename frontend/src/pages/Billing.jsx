@@ -84,8 +84,8 @@ function Billing() {
   const lookupCustomer = async () => {
     const phone = customerPhone.trim()
     if (!phone) {
-      setCustomerLookupMessage('Enter a customer phone number to look up the profile.')
       setCustomerInfo(null)
+      setCustomerLookupMessage('')
       return
     }
 
@@ -98,10 +98,10 @@ function Billing() {
         setCustomerLookupMessage('No customer record found for this phone number.')
         return
       }
+      const points = Number(customer.loyaltyPoints || 0)
       setCustomerInfo(customer)
-      setCustomerLookupMessage('Customer profile found.')
-      const maxRedeem = Number(customer.loyaltyPoints || 0)
-      setRedeemPoints(String(Math.min(Number(redeemPoints) || 0, maxRedeem || 0)))
+      setCustomerLookupMessage(`This customer has ${points} points`)
+      setRedeemPoints(String(Math.min(Number(redeemPoints) || 0, points)))
     } catch (requestError) {
       setCustomerInfo(null)
       setCustomerLookupMessage(requestError.response?.data?.message || 'Unable to look up customer.')
@@ -118,13 +118,13 @@ function Billing() {
     try {
       setError('')
       const orderSubtotal = Number(selectedOrder?.subtotal || 0) + Number(selectedOrder?.cgst || 0) + Number(selectedOrder?.sgst || 0)
-      const response = await validateCoupon({ code: rawCode, orderSubtotal })
+      const response = await validateCoupon(rawCode, orderSubtotal)
       const discountAmount = Number(response.data?.data?.discountAmount || 0)
       setCouponInfo(response.data?.data || null)
-      setDiscount(String(Math.max(Number(discount) || 0, discountAmount)))
-      setError('')
+      setDiscount(String(discountAmount))
     } catch (requestError) {
       setCouponInfo(null)
+      setDiscount('0')
       setError(requestError.response?.data?.message || 'Unable to validate coupon.')
     }
   }
@@ -167,17 +167,14 @@ function Billing() {
       <div className="flex justify-between text-sm text-gray-600"><span>SGST</span><span>{money(selectedOrder.sgst)}</span></div>
 
       <div className="mt-4 space-y-3 rounded-xl bg-slate-50 p-3">
-        <div className="flex items-center gap-2 text-sm font-medium text-secondary"><UserRound size={16} /> Customer</div>
-        <div className="flex gap-2">
-          <input className="input-field flex-1" onChange={(event) => setCustomerPhone(event.target.value)} placeholder="Phone number" type="text" value={customerPhone} />
-          <button className="btn-secondary px-3" onClick={lookupCustomer} type="button">Lookup</button>
-        </div>
+        <div className="flex items-center gap-2 text-sm font-medium text-secondary"><UserRound size={16} /> Customer Phone (optional)</div>
+        <input className="input-field" onBlur={lookupCustomer} onChange={(event) => setCustomerPhone(event.target.value)} placeholder="Enter customer phone number" type="text" value={customerPhone} />
         {customerLookupMessage && <p className="text-xs text-gray-500">{customerLookupMessage}</p>}
         {customerInfo && <div className="rounded-lg border border-primary/20 bg-white p-2 text-xs text-gray-600"><div className="font-medium text-secondary">{customerInfo.name || 'Customer'}</div><div className="mt-1">Loyalty points: <span className="font-semibold text-primary">{Number(customerInfo.loyaltyPoints || 0)}</span></div></div>}
       </div>
 
       <div className="mt-4 space-y-3 rounded-xl bg-slate-50 p-3">
-        <div className="flex items-center gap-2 text-sm font-medium text-secondary"><Gift size={16} /> Coupon & loyalty</div>
+        <div className="flex items-center gap-2 text-sm font-medium text-secondary"><Gift size={16} /> Coupon Code</div>
         <div className="flex gap-2">
           <input className="input-field flex-1 uppercase" onChange={(event) => setCouponCode(event.target.value)} placeholder="Coupon code" type="text" value={couponCode} />
           <button className="btn-secondary px-3" onClick={validateCurrentCoupon} type="button">Apply</button>

@@ -1,4 +1,4 @@
-import { ChefHat, ClipboardList, FileText, LayoutGrid, Lightbulb, LogOut, Package, Receipt, ShoppingCart, Store, TrendingUp, Truck, Users, UtensilsCrossed } from 'lucide-react'
+import { ChefHat, ClipboardList, FileText, LayoutGrid, Lightbulb, LogOut, Package, Receipt, ShoppingCart, Store, Tag, TrendingUp, Truck, UserCircle, UtensilsCrossed } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
 
@@ -12,8 +12,8 @@ function Dashboard() {
     { title: 'Kitchen Display', description: 'Keep up with active orders.', path: '/dashboard/kitchen', icon: ChefHat },
     { title: 'Billing', description: 'Review payments and invoices.', path: '/dashboard/billing', icon: Receipt },
     { title: 'Bill History', description: 'Browse completed bills and payment totals.', path: '/dashboard/bills', icon: FileText },
-    ...(user?.role === 'owner' || user?.role === 'manager' ? [{ title: 'Customer CRM', description: 'Track customer loyalty and recent visits.', path: '/dashboard/customers', icon: Users }] : []),
-    ...(user?.role === 'owner' || user?.role === 'manager' ? [{ title: 'Coupons', description: 'Create and manage customer discounts.', path: '/dashboard/coupons', icon: Users }] : []),
+    ...(user?.role === 'owner' || user?.role === 'manager' ? [{ title: 'Customer CRM', description: 'Track customer loyalty and recent visits.', path: '/dashboard/customers', icon: UserCircle }] : []),
+    ...(user?.role === 'owner' || user?.role === 'manager' ? [{ title: 'Coupons', description: 'Create and manage customer discounts.', path: '/dashboard/coupons', icon: Tag }] : []),
     ...(user?.role === 'owner' || user?.role === 'manager' ? [{ title: 'Staff Management', description: 'Manage restaurant staff and access.', path: '/dashboard/staff', icon: Users }] : []),
     ...(user?.role === 'owner' || user?.role === 'manager' ? [{ title: 'Suppliers', description: 'Manage supplier records and contacts.', path: '/dashboard/suppliers', icon: Truck }] : []),
     ...(user?.role === 'owner' || user?.role === 'manager' ? [{ title: 'Purchase Orders', description: 'Track stock purchases and deliveries.', path: '/dashboard/purchase-orders', icon: ClipboardList }] : []),
