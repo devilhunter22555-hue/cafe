@@ -1,0 +1,60 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    font-family: 'DM Sans', 'Trebuchet MS', sans-serif;
+    color: #1E293B;
+    background: #f8fafc;
+    font-synthesis: none;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    margin: 0;
+    min-width: 320px;
+    min-height: 100vh;
+    background: #f8fafc;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply rounded-lg bg-primary px-4 py-2.5 font-medium text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60;
+  }
+
+  .btn-secondary {
+    @apply rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-secondary transition hover:bg-slate-50;
+  }
+
+  .btn-secondary.compact {
+    @apply px-3 py-1.5 text-sm;
+  }
+
+  .card {
+    @apply rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200;
+  }
+
+  .input-field {
+    @apply w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-secondary focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary;
+  }
+
+  .badge-success {
+    @apply rounded-full bg-green-100 px-2 py-1 text-xs font-medium text-green-800;
+  }
+
+  .badge-danger {
+    @apply rounded-full bg-red-100 px-2 py-1 text-xs font-medium text-red-800;
+  }
+
+  .badge-warning {
+    @apply rounded-full bg-amber-100 px-2 py-1 text-xs font-medium text-amber-800;
+  }
+}
