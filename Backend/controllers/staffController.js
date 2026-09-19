@@ -10,6 +10,14 @@ function createError(message, statusCode) {
   return error;
 }
 
+function validatePassword(password) {
+  if (typeof password !== 'string') return false;
+  if (password.length < 8) return false;
+  if (!/[A-Za-z]/.test(password)) return false;
+  if (!/\d/.test(password)) return false;
+  return true;
+}
+
 function publicStaff(user) {
   const data = user.toObject ? user.toObject() : { ...user };
   delete data.password;
@@ -40,6 +48,9 @@ async function createStaff(req, res, next) {
     const { name, email, password, role, branchId } = req.body;
     if (!name || !email || !password || !role || !branchId) {
       throw createError('name, email, password, role, and branchId are required', 400);
+    }
+    if (!validatePassword(password)) {
+      throw createError('Password must be at least 8 characters long and include at least one letter and one number', 400);
     }
     if (!staffRoles.includes(role)) throw createError('Invalid staff role', 400);
     if (req.user.role === 'manager' && role === 'manager') {
@@ -114,6 +125,9 @@ async function resetStaffPassword(req, res, next) {
   try {
     const { newPassword } = req.body;
     if (!newPassword) throw createError('newPassword is required', 400);
+    if (!validatePassword(newPassword)) {
+      throw createError('Password must be at least 8 characters long and include at least one letter and one number', 400);
+    }
     const staff = await findManagedStaff(req.params.id, req);
     staff.password = newPassword;
     await staff.save();

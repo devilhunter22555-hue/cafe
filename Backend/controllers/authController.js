@@ -41,6 +41,14 @@ function createError(message, statusCode) {
   return error;
 }
 
+function validatePassword(password) {
+  if (typeof password !== 'string') return false;
+  if (password.length < 8) return false;
+  if (!/[A-Za-z]/.test(password)) return false;
+  if (!/\d/.test(password)) return false;
+  return true;
+}
+
 async function register(req, res, next) {
   let session;
   try {
@@ -48,6 +56,9 @@ async function register(req, res, next) {
     const { restaurantName, ownerName, email, password } = req.body;
     if (!restaurantName || !ownerName || !email || !password) {
       throw createError('restaurantName, ownerName, email, and password are required', 400);
+    }
+    if (!validatePassword(password)) {
+      throw createError('Password must be at least 8 characters long and include at least one letter and one number', 400);
     }
 
     let createdUser;

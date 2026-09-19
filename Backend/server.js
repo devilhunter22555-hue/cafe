@@ -4,6 +4,9 @@ const http = require('http');
 const express = require('express');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
+const { rateLimit, ipKeyGenerator } = require('express-rate-limit');
+const helmet = require('helmet');
+const mongoSanitize = require('express-mongo-sanitize');
 const { Server } = require('socket.io');
 const connectDB = require('./config/db');
 const authRoutes = require('./routes/authRoutes');
@@ -35,6 +38,13 @@ if (missingEnvVars.length > 0) {
   process.exit(1);
 }
 
+if (process.env.JWT_ACCESS_SECRET && process.env.JWT_ACCESS_SECRET.length < 32) {
+  console.warn('WARNING: JWT_ACCESS_SECRET is shorter than 32 characters. Use a long random secret in production.');
+}
+if (process.env.JWT_REFRESH_SECRET && process.env.JWT_REFRESH_SECRET.length < 32) {
+  console.warn('WARNING: JWT_REFRESH_SECRET is shorter than 32 characters. Use a long random secret in production.');
+}
+
 const app = express();
 const httpServer = http.createServer(app);
 const allowedOrigins = [
@@ -53,9 +63,71 @@ const corsOptions = {
 };
 const io = new Server(httpServer, { cors: corsOptions });
 
+const loginRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    data: null,
+    message: 'Too many login attempts. Please try again in 15 minutes.',
+    statusCode: 429
+  },
+  keyGenerator: ipKeyGenerator
+});
+
+const registerRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    data: null,
+    message: 'Too many registration attempts. Please try again in 15 minutes.',
+    statusCode: 429
+  },
+  keyGenerator: ipKeyGenerator
+});
+
+const apiRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 200,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    data: null,
+    message: 'Too many requests from this IP. Please try again later.',
+    statusCode: 429
+  },
+  keyGenerator: ipKeyGenerator
+});
+
+const otpRequestRateLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  max: 3,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    data: null,
+    message: 'Too many OTP requests for this phone number. Please try again in 10 minutes.',
+    statusCode: 429
+  },
+  keyGenerator: (req) => String(req.body?.phone || req.ip || 'unknown-phone').trim().toLowerCase()
+});
+
+app.use(helmet());
 app.use(cors(corsOptions));
 app.use(express.json());
+app.use(mongoSanitize());
 app.use(cookieParser());
+app.use('/api/auth/login', loginRateLimiter);
+app.use('/api/auth/register', registerRateLimiter);
+app.use('/api/customer/request-otp', otpRequestRateLimiter);
+app.use('/api', apiRateLimiter);
 
 io.on('connection', (socket) => {
   socket.on('join-branch', (branchId) => {
