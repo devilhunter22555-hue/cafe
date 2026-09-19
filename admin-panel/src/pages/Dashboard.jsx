@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Shield, LogOut } from 'lucide-react'
+import { Shield, LogOut, CreditCard } from 'lucide-react'
 import { useAdminAuth } from '../context/AdminAuthContext.jsx'
 import { getRestaurants } from '../api/adminApi.js'
 
@@ -52,6 +52,10 @@ function Dashboard() {
 
           <div className="flex items-center gap-3">
             <span className="text-sm font-medium text-secondary">{admin?.name || 'Super Admin'}</span>
+            <Link to="/dashboard/plans" className="btn-secondary flex items-center gap-2">
+              <CreditCard className="h-4 w-4" />
+              Plans
+            </Link>
             <button type="button" onClick={handleLogout} className="btn-secondary flex items-center gap-2">
               <LogOut className="h-4 w-4" />
               Logout
@@ -89,7 +93,7 @@ function Dashboard() {
                     {restaurant.isActive ? 'Active' : 'Suspended'}
                   </span>
 
-                  <Link to={`/restaurant/${restaurant._id}`} className="btn-secondary compact">
+                  <Link to={`/dashboard/restaurants/${restaurant._id}`} className="btn-secondary compact">
                     View Details
                   </Link>
                 </div>

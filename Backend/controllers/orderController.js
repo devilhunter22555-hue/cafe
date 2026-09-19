@@ -419,6 +419,12 @@ async function generateBill(req, res, next) {
         throw createError('Cannot bill an order with no active items', 400);
       }
 
+      console.log('[generateBill customerPhone]', {
+        customerPhone: req.body.customerPhone,
+        restaurantId: req.restaurantId,
+        orderId: req.params.id
+      });
+
       const requestedPhone = req.body.customerPhone ? String(req.body.customerPhone).trim() : '';
       const resolvedPhone = requestedPhone || (order.customerPhone ? String(order.customerPhone).trim() : '');
 

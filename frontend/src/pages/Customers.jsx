@@ -42,7 +42,7 @@ function Customers() {
         const customer = response.data?.data
         setCustomers(customer ? [customer] : [])
       } else {
-        response = await getCustomers({ limit: 50 })
+        response = await getCustomers({ search: '', limit: 50 })
         setCustomers(response.data?.data || [])
       }
     } catch (requestError) {
