@@ -68,12 +68,26 @@ Data:
 Return only the final summary text, no bullet list, no markdown.
 `;
 
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash', generationConfig: { temperature: 0.3 } });
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    return response.text();
+    const modelNames = ['gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-1.5-flash', 'gemini-1.5-flash-latest'];
+    let lastError = null;
+
+    for (const modelName of modelNames) {
+      try {
+        const model = genAI.getGenerativeModel({
+          model: modelName,
+          generationConfig: { temperature: 0.3 }
+        });
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        return response.text();
+      } catch (error) {
+        lastError = error;
+      }
+    }
+
+    throw lastError || new Error('No Gemini model was available');
   } catch (error) {
-    console.error('Gemini summary generation failed:', error.message || error);
+    console.error('Gemini summary generation failed:', error?.message || error);
     return null;
   }
 }

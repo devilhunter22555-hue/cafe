@@ -24,6 +24,7 @@ const staffRoutes = require('./routes/staffRoutes');
 const supplierRoutes = require('./routes/supplierRoutes');
 const purchaseOrderRoutes = require('./routes/purchaseOrderRoutes');
 const insightsRoutes = require('./routes/insightsRoutes');
+const couponRoutes = require('./routes/couponRoutes');
 const errorHandler = require('./middleware/errorHandler');
 
 const requiredEnvVars = ['MONGO_URI', 'JWT_ACCESS_SECRET', 'JWT_REFRESH_SECRET'];
@@ -85,6 +86,7 @@ app.use('/api/recipes', recipeRoutes);
 app.use('/api/staff', staffRoutes);
 app.use('/api/suppliers', supplierRoutes);
 app.use('/api/purchase-orders', purchaseOrderRoutes);
+app.use('/api/coupons', couponRoutes);
 app.use('/api/insights', insightsRoutes);
 app.use(errorHandler);
 
