@@ -1,4 +1,4 @@
-import { ChefHat, ClipboardList, FileText, LayoutGrid, Lightbulb, LogOut, Package, Receipt, ShoppingCart, Store, Tag, TrendingUp, Truck, UserCircle, UtensilsCrossed } from 'lucide-react'
+import { ChefHat, ClipboardList, FileText, LayoutGrid, Lightbulb, LogOut, Package, Receipt, ShoppingCart, Store, Tag, TrendingUp, Truck, UserCircle, Users, UtensilsCrossed } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
 

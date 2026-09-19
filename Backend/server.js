@@ -116,10 +116,12 @@ const otpRequestRateLimiter = rateLimit({
     message: 'Too many OTP requests for this phone number. Please try again in 10 minutes.',
     statusCode: 429
   },
-  keyGenerator: (req) => String(req.body?.phone || req.ip || 'unknown-phone').trim().toLowerCase()
+  keyGenerator: (req) => `${ipKeyGenerator(req)}:${String(req.body?.phone || 'unknown-phone').trim().toLowerCase()}`
 });
 
-app.use(helmet());
+app.use(helmet({
+  crossOriginResourcePolicy: false
+}));
 app.use(cors(corsOptions));
 app.use(express.json());
 app.use(mongoSanitize());
