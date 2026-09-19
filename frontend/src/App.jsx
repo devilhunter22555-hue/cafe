@@ -15,6 +15,8 @@ import StaffManagement from './pages/StaffManagement.jsx'
 import Suppliers from './pages/Suppliers.jsx'
 import PurchaseOrders from './pages/PurchaseOrders.jsx'
 import Insights from './pages/Insights.jsx'
+import Customers from './pages/Customers.jsx'
+import Coupons from './pages/Coupons.jsx'
 
 function App() {
   return <Routes>
@@ -34,6 +36,8 @@ function App() {
       <Route path="/dashboard/suppliers" element={<Suppliers />} />
       <Route path="/dashboard/purchase-orders" element={<PurchaseOrders />} />
       <Route path="/dashboard/insights" element={<Insights />} />
+      <Route path="/dashboard/customers" element={<Customers />} />
+      <Route path="/dashboard/coupons" element={<Coupons />} />
       <Route path="/menu" element={<MenuManagement />} />
       <Route path="/tables" element={<TableManagement />} />
       <Route path="/" element={<Dashboard />} />

@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Banknote, CreditCard, Smartphone } from 'lucide-react'
+import { Banknote, CreditCard, Gift, Smartphone, UserRound } from 'lucide-react'
+import { validateCoupon } from '../api/couponApi.js'
+import { lookupCustomerByPhone } from '../api/customerCrmApi.js'
 import { generateBill, getOrderById, getOrders } from '../api/orderApi.js'
 import { useAuth } from '../context/AuthContext.jsx'
 
@@ -43,6 +45,12 @@ function Billing() {
   const [billedOrder, setBilledOrder] = useState(null)
   const [discount, setDiscount] = useState('0')
   const [paymentMode, setPaymentMode] = useState('')
+  const [customerPhone, setCustomerPhone] = useState('')
+  const [customerInfo, setCustomerInfo] = useState(null)
+  const [customerLookupMessage, setCustomerLookupMessage] = useState('')
+  const [couponCode, setCouponCode] = useState('')
+  const [couponInfo, setCouponInfo] = useState(null)
+  const [redeemPoints, setRedeemPoints] = useState('0')
   const [error, setError] = useState('')
 
   useEffect(() => {
@@ -63,13 +71,71 @@ function Billing() {
   const selectOrder = (order) => {
     setSelectedOrder(order)
     setDiscount(String(order.discount || 0))
+    setCustomerPhone(order.customerPhone || '')
+    setCustomerInfo(null)
+    setCustomerLookupMessage('')
+    setCouponCode('')
+    setCouponInfo(null)
+    setRedeemPoints('0')
     setPaymentMode('')
     setError('')
   }
 
+  const lookupCustomer = async () => {
+    const phone = customerPhone.trim()
+    if (!phone) {
+      setCustomerLookupMessage('Enter a customer phone number to look up the profile.')
+      setCustomerInfo(null)
+      return
+    }
+
+    try {
+      setError('')
+      const response = await lookupCustomerByPhone(phone)
+      const customer = response.data?.data
+      if (!customer) {
+        setCustomerInfo(null)
+        setCustomerLookupMessage('No customer record found for this phone number.')
+        return
+      }
+      setCustomerInfo(customer)
+      setCustomerLookupMessage('Customer profile found.')
+      const maxRedeem = Number(customer.loyaltyPoints || 0)
+      setRedeemPoints(String(Math.min(Number(redeemPoints) || 0, maxRedeem || 0)))
+    } catch (requestError) {
+      setCustomerInfo(null)
+      setCustomerLookupMessage(requestError.response?.data?.message || 'Unable to look up customer.')
+    }
+  }
+
+  const validateCurrentCoupon = async () => {
+    const rawCode = couponCode.trim()
+    if (!rawCode) {
+      setError('Enter a coupon code to validate it.')
+      return
+    }
+
+    try {
+      setError('')
+      const orderSubtotal = Number(selectedOrder?.subtotal || 0) + Number(selectedOrder?.cgst || 0) + Number(selectedOrder?.sgst || 0)
+      const response = await validateCoupon({ code: rawCode, orderSubtotal })
+      const discountAmount = Number(response.data?.data?.discountAmount || 0)
+      setCouponInfo(response.data?.data || null)
+      setDiscount(String(Math.max(Number(discount) || 0, discountAmount)))
+      setError('')
+    } catch (requestError) {
+      setCouponInfo(null)
+      setError(requestError.response?.data?.message || 'Unable to validate coupon.')
+    }
+  }
+
   const createBill = async () => {
     try {
-      const response = await generateBill(selectedOrder._id, Number(discount) || 0, paymentMode)
+      const currentRedeem = Math.min(Number(redeemPoints) || 0, Number(customerInfo?.loyaltyPoints || 0))
+      const response = await generateBill(selectedOrder._id, Number(discount) || 0, paymentMode, {
+        customerPhone: customerPhone.trim() || undefined,
+        redeemPoints: currentRedeem,
+      })
       const order = { ...response.data.data.order, tableId: selectedOrder.tableId }
       setOrders((currentOrders) => currentOrders.filter((currentOrder) => currentOrder._id !== selectedOrder._id))
       setBilledOrder({ order, bill: response.data.data.bill })
@@ -99,7 +165,30 @@ function Billing() {
       <div className="flex justify-between text-sm text-gray-600"><span>Subtotal</span><span>{money(selectedOrder.subtotal)}</span></div>
       <div className="flex justify-between text-sm text-gray-600"><span>CGST</span><span>{money(selectedOrder.cgst)}</span></div>
       <div className="flex justify-between text-sm text-gray-600"><span>SGST</span><span>{money(selectedOrder.sgst)}</span></div>
-      <label className="mt-3 flex items-center justify-between text-sm text-gray-600">Discount<input className="input-field w-20 text-right" min="0" onChange={(event) => setDiscount(event.target.value)} step="0.01" type="number" value={discount} /></label>
+
+      <div className="mt-4 space-y-3 rounded-xl bg-slate-50 p-3">
+        <div className="flex items-center gap-2 text-sm font-medium text-secondary"><UserRound size={16} /> Customer</div>
+        <div className="flex gap-2">
+          <input className="input-field flex-1" onChange={(event) => setCustomerPhone(event.target.value)} placeholder="Phone number" type="text" value={customerPhone} />
+          <button className="btn-secondary px-3" onClick={lookupCustomer} type="button">Lookup</button>
+        </div>
+        {customerLookupMessage && <p className="text-xs text-gray-500">{customerLookupMessage}</p>}
+        {customerInfo && <div className="rounded-lg border border-primary/20 bg-white p-2 text-xs text-gray-600"><div className="font-medium text-secondary">{customerInfo.name || 'Customer'}</div><div className="mt-1">Loyalty points: <span className="font-semibold text-primary">{Number(customerInfo.loyaltyPoints || 0)}</span></div></div>}
+      </div>
+
+      <div className="mt-4 space-y-3 rounded-xl bg-slate-50 p-3">
+        <div className="flex items-center gap-2 text-sm font-medium text-secondary"><Gift size={16} /> Coupon & loyalty</div>
+        <div className="flex gap-2">
+          <input className="input-field flex-1 uppercase" onChange={(event) => setCouponCode(event.target.value)} placeholder="Coupon code" type="text" value={couponCode} />
+          <button className="btn-secondary px-3" onClick={validateCurrentCoupon} type="button">Apply</button>
+        </div>
+        {couponInfo && <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-2 text-xs text-emerald-700">Coupon applied: {couponInfo.coupon?.code} • Discount {money(couponInfo.discountAmount)}</div>}
+        <div className="grid grid-cols-2 gap-2">
+          <label className="text-sm text-gray-600">Manual discount<input className="input-field mt-1 text-right" min="0" onChange={(event) => setDiscount(event.target.value)} step="0.01" type="number" value={discount} /></label>
+          <label className="text-sm text-gray-600">Redeem points<input className="input-field mt-1 text-right" max={Number(customerInfo?.loyaltyPoints || 0)} min="0" onChange={(event) => setRedeemPoints(event.target.value)} step="1" type="number" value={redeemPoints} /></label>
+        </div>
+      </div>
+
       <div className="mt-4"><p className="mb-2 text-sm text-gray-600">Payment Mode</p><div className="flex gap-2">{[['cash', 'Cash', Banknote], ['card', 'Card', CreditCard], ['upi', 'UPI', Smartphone]].map(([value, label, Icon]) => <button className={`flex-1 rounded-lg border py-2 text-sm font-medium ${paymentMode === value ? 'border-primary bg-primary/10 text-primary' : 'border-gray-300 bg-white text-gray-600'}`} key={value} onClick={() => setPaymentMode(value)} type="button"><Icon className="mx-auto mb-1" size={18} />{label}</button>)}</div></div>
       <div className="mt-2 flex justify-between border-t pt-2 text-lg font-bold text-secondary"><span>Total</span><span>{money(totalFor(selectedOrder, discount))}</span></div>
       {error && <p className="mt-3 text-sm text-danger">{error}</p>}
