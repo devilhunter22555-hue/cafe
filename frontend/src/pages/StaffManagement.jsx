@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
-import { KeyRound, Pencil, Plus, UserX, Users, X } from 'lucide-react'
+import { IndianRupee, KeyRound, Pencil, Plus, UserX, Users, X } from 'lucide-react'
 import axiosInstance from '../api/axiosInstance.js'
 import { createStaff, deactivateStaff, getStaff, resetStaffPassword, updateStaff } from '../api/staffApi.js'
+import { setStaffSalary } from '../api/salaryApi.js'
 import { useAuth } from '../context/AuthContext.jsx'
 
 const roleStyles = {
@@ -32,7 +33,9 @@ function StaffManagement() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [isResetPasswordModalOpen, setIsResetPasswordModalOpen] = useState(false)
+  const [isSalaryModalOpen, setIsSalaryModalOpen] = useState(false)
   const [selectedStaffId, setSelectedStaffId] = useState(null)
+  const [selectedStaffName, setSelectedStaffName] = useState('')
 
   const [staffForm, setStaffForm] = useState({
     name: '',
@@ -49,6 +52,7 @@ function StaffManagement() {
   })
 
   const [newPassword, setNewPassword] = useState('')
+  const [monthlySalary, setMonthlySalary] = useState('')
 
   const loadBranches = async () => {
     try {
@@ -128,6 +132,13 @@ function StaffManagement() {
     setIsResetPasswordModalOpen(true)
   }
 
+  const openSalaryModal = (member) => {
+    setSelectedStaffId(member._id || member.id)
+    setSelectedStaffName(member.name)
+    setMonthlySalary(member.monthlySalary ?? '')
+    setIsSalaryModalOpen(true)
+  }
+
   const handleCreateStaff = async (event) => {
     event.preventDefault()
     setError('')
@@ -203,6 +214,24 @@ function StaffManagement() {
     }
   }
 
+  const handleSetSalary = async (event) => {
+    event.preventDefault()
+    setError('')
+    try {
+      const salary = Number(monthlySalary)
+      if (!selectedStaffId || !Number.isFinite(salary) || salary < 0) {
+        setError('Please enter a valid monthly salary.')
+        return
+      }
+      await setStaffSalary(selectedStaffId, salary)
+      setSuccessMessage('Staff salary updated successfully.')
+      setIsSalaryModalOpen(false)
+      await loadStaff()
+    } catch (salaryError) {
+      setError(salaryError.response?.data?.message || 'Unable to update staff salary.')
+    }
+  }
+
   if (!isAllowed) {
     return (
       <main className="p-6">
@@ -240,7 +269,7 @@ function StaffManagement() {
               const memberId = member._id || member.id
               const memberBranchName = member.branchId?.name || 'No branch'
               const canDeactivate = String(currentUserId) !== String(memberId)
-              const roleOption = getRoleOptions(user?.role)
+              const canSetSalary = user?.role === 'owner' || member.role !== 'manager'
 
               return (
                 <div className="card flex items-center justify-between p-4" key={memberId}>
@@ -258,6 +287,7 @@ function StaffManagement() {
                   </div>
 
                   <div className="flex items-center gap-2">
+                    {canSetSalary && <button className="rounded-md border border-primary/30 px-2 py-1.5 text-xs font-medium text-primary transition hover:bg-primary/10" onClick={() => openSalaryModal(member)} title="Set monthly salary" type="button"><IndianRupee className="inline" size={14} /> Set Salary</button>}
                     <button className="rounded-md p-2 text-gray-600 transition hover:bg-slate-100 hover:text-secondary" onClick={() => openEditModal(member)} title="Edit staff" type="button">
                       <Pencil size={18} />
                     </button>
@@ -394,6 +424,19 @@ function StaffManagement() {
                 <button className="btn-secondary" onClick={() => setIsResetPasswordModalOpen(false)} type="button">Cancel</button>
                 <button className="btn-primary" type="submit">Confirm</button>
               </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {isSalaryModalOpen && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/40 p-4">
+          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+            <div className="mb-4 flex items-center justify-between"><h2 className="text-xl font-bold text-secondary">Set Salary</h2><button className="rounded-full p-2 text-gray-500 hover:bg-slate-100" onClick={() => setIsSalaryModalOpen(false)} type="button"><X size={18} /></button></div>
+            <form className="space-y-4" onSubmit={handleSetSalary}>
+              <p className="text-sm text-gray-500">Set the fixed monthly salary for {selectedStaffName}.</p>
+              <label className="block text-sm font-medium text-secondary">Monthly salary (₹)<input className="input-field mt-1" min="0" onChange={(event) => setMonthlySalary(event.target.value)} required step="0.01" type="number" value={monthlySalary} /></label>
+              <div className="flex justify-end gap-3 pt-2"><button className="btn-secondary" onClick={() => setIsSalaryModalOpen(false)} type="button">Cancel</button><button className="btn-primary" type="submit">Save Salary</button></div>
             </form>
           </div>
         </div>

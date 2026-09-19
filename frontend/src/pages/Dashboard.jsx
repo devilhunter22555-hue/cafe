@@ -1,4 +1,4 @@
-import { ChefHat, ClipboardList, FileText, LayoutGrid, Lightbulb, LogOut, Package, Receipt, ShoppingCart, Store, Tag, TrendingUp, Truck, UserCircle, Users, UtensilsCrossed } from 'lucide-react'
+import { ChefHat, ClipboardList, FileText, LayoutGrid, Lightbulb, LogOut, Package, Receipt, ShoppingCart, Store, Tag, TrendingUp, Truck, UserCircle, Users, UtensilsCrossed, Wallet } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
 
@@ -15,6 +15,8 @@ function Dashboard() {
     ...(user?.role === 'owner' || user?.role === 'manager' ? [{ title: 'Customer CRM', description: 'Track customer loyalty and recent visits.', path: '/dashboard/customers', icon: UserCircle }] : []),
     ...(user?.role === 'owner' || user?.role === 'manager' ? [{ title: 'Coupons', description: 'Create and manage customer discounts.', path: '/dashboard/coupons', icon: Tag }] : []),
     ...(user?.role === 'owner' || user?.role === 'manager' ? [{ title: 'Staff Management', description: 'Manage restaurant staff and access.', path: '/dashboard/staff', icon: Users }] : []),
+    ...(user?.role === 'owner' || user?.role === 'manager' ? [{ title: 'Salary Management', description: 'Generate and pay staff salaries.', path: '/dashboard/salary', icon: Wallet }] : []),
+    { title: 'My Salary', description: 'Review your salary records and payments.', path: '/dashboard/my-salary', icon: Wallet },
     ...(user?.role === 'owner' || user?.role === 'manager' ? [{ title: 'Suppliers', description: 'Manage supplier records and contacts.', path: '/dashboard/suppliers', icon: Truck }] : []),
     ...(user?.role === 'owner' || user?.role === 'manager' ? [{ title: 'Purchase Orders', description: 'Track stock purchases and deliveries.', path: '/dashboard/purchase-orders', icon: ClipboardList }] : []),
     ...(user?.role === 'owner' || user?.role === 'manager' ? [{ title: 'Analytics', description: 'Track revenue, trends, and top sellers.', path: '/dashboard/analytics', icon: TrendingUp }] : []),
