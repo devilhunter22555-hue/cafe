@@ -28,9 +28,10 @@ const supplierRoutes = require('./routes/supplierRoutes');
 const purchaseOrderRoutes = require('./routes/purchaseOrderRoutes');
 const insightsRoutes = require('./routes/insightsRoutes');
 const couponRoutes = require('./routes/couponRoutes');
+const superAdminRoutes = require('./routes/superAdminRoutes');
 const errorHandler = require('./middleware/errorHandler');
 
-const requiredEnvVars = ['MONGO_URI', 'JWT_ACCESS_SECRET', 'JWT_REFRESH_SECRET'];
+const requiredEnvVars = ['MONGO_URI', 'JWT_ACCESS_SECRET', 'JWT_REFRESH_SECRET', 'SUPER_ADMIN_JWT_SECRET'];
 const missingEnvVars = requiredEnvVars.filter((name) => !process.env[name]);
 
 if (missingEnvVars.length > 0) {
@@ -43,6 +44,9 @@ if (process.env.JWT_ACCESS_SECRET && process.env.JWT_ACCESS_SECRET.length < 32) 
 }
 if (process.env.JWT_REFRESH_SECRET && process.env.JWT_REFRESH_SECRET.length < 32) {
   console.warn('WARNING: JWT_REFRESH_SECRET is shorter than 32 characters. Use a long random secret in production.');
+}
+if (process.env.SUPER_ADMIN_JWT_SECRET && process.env.SUPER_ADMIN_JWT_SECRET.length < 32) {
+  console.warn('WARNING: SUPER_ADMIN_JWT_SECRET is shorter than 32 characters. Use a long random secret in production.');
 }
 
 const app = express();
@@ -162,6 +166,7 @@ app.use('/api/suppliers', supplierRoutes);
 app.use('/api/purchase-orders', purchaseOrderRoutes);
 app.use('/api/coupons', couponRoutes);
 app.use('/api/insights', insightsRoutes);
+app.use('/api/super-admin', superAdminRoutes);
 app.use(errorHandler);
 
 const port = process.env.PORT || 5000;

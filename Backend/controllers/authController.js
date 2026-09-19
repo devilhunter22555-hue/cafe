@@ -114,6 +114,11 @@ async function login(req, res, next) {
       throw createError('Account has been deactivated. Contact your restaurant owner.', 403);
     }
 
+    const restaurant = await Restaurant.findById(user.restaurantId);
+    if (!restaurant || restaurant.isActive === false) {
+      throw createError("This restaurant's account has been suspended. Contact support.", 403);
+    }
+
     const accessToken = generateAccessToken(authPayload(user));
     const refreshToken = generateRefreshToken(authPayload(user));
     res.cookie('refreshToken', refreshToken, refreshCookieOptions);
@@ -142,6 +147,11 @@ async function refreshToken(req, res, next) {
 
     if (user.isActive === false) {
       throw createError('Account has been deactivated. Contact your restaurant owner.', 403);
+    }
+
+    const restaurant = await Restaurant.findById(user.restaurantId);
+    if (!restaurant || restaurant.isActive === false) {
+      throw createError("This restaurant's account has been suspended. Contact support.", 403);
     }
 
     const accessToken = generateAccessToken(authPayload(user));
