@@ -28,6 +28,7 @@ const supplierRoutes = require('./routes/supplierRoutes');
 const purchaseOrderRoutes = require('./routes/purchaseOrderRoutes');
 const insightsRoutes = require('./routes/insightsRoutes');
 const couponRoutes = require('./routes/couponRoutes');
+const salaryRoutes = require('./routes/salaryRoutes');
 const superAdminRoutes = require('./routes/superAdminRoutes');
 const errorHandler = require('./middleware/errorHandler');
 
@@ -166,6 +167,7 @@ app.use('/api/staff', staffRoutes);
 app.use('/api/suppliers', supplierRoutes);
 app.use('/api/purchase-orders', purchaseOrderRoutes);
 app.use('/api/coupons', couponRoutes);
+app.use('/api/salary', salaryRoutes);
 app.use('/api/insights', insightsRoutes);
 app.use('/api/super-admin', superAdminRoutes);
 app.use(errorHandler);

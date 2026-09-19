@@ -8,7 +8,8 @@ const userSchema = new mongoose.Schema({
   email: { type: String, required: true, unique: true, lowercase: true, trim: true },
   password: { type: String, required: true },
   role: { type: String, enum: ['owner', 'manager', 'cashier', 'kitchen', 'waiter'], required: true },
-  isActive: { type: Boolean, default: true }
+  isActive: { type: Boolean, default: true },
+  monthlySalary: { type: Number, default: 0, min: 0 }
 }, { timestamps: true });
 
 userSchema.pre('save', async function hashPassword(next) {
