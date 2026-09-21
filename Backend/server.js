@@ -55,7 +55,7 @@ const httpServer = http.createServer(app);
 const allowedOrigins = [
   process.env.CLIENT_URL || 'http://localhost:5173',
   process.env.CUSTOMER_APP_URL || 'http://localhost:5174',
-  process.env.ADMIN_APP_URL || 'http://localhost:5175'
+  process.env.ADMIN_PANEL_URL || 'http://localhost:5175'
 ];
 const corsOptions = {
   origin(origin, callback) {
