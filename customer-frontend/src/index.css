@@ -3,5 +3,43 @@
 @tailwind utilities;
 
 @layer base {
-  body { @apply m-0 min-h-screen bg-orange-50 text-secondary; }
+  :root {
+    font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    color: #2B2118;
+    background-color: #F7F5F2;
+    font-synthesis: none;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    margin: 0;
+    min-width: 320px;
+    min-height: 100vh;
+    background-color: #F7F5F2;
+    color: #2B2118;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply inline-flex items-center justify-center rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-xs transition-all hover:bg-dark-coffee active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60;
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center rounded-xl border border-[#EBE7DF] bg-white px-4 py-2.5 text-sm font-semibold text-[#2B2118] shadow-2xs transition-all hover:bg-[#F7F5F2] hover:border-[#6F4E37]/30 active:scale-[0.98];
+  }
+
+  .card {
+    @apply rounded-2xl border border-[#EBE7DF] bg-white p-5 shadow-xs transition-shadow;
+  }
+
+  .input-field {
+    @apply w-full rounded-xl border border-[#EBE7DF] bg-[#F7F5F2] px-3.5 py-2.5 text-sm text-[#2B2118] placeholder:text-[#7A7068]/50 transition-all focus:bg-white focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20;
+  }
 }

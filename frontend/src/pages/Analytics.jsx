@@ -1,5 +1,16 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
+  AlertCircle,
+  BarChart3,
+  Calendar,
+  CreditCard,
+  DollarSign,
+  PieChart as PieChartIcon,
+  Receipt,
+  TrendingUp,
+  UtensilsCrossed
+} from 'lucide-react'
+import {
   Bar,
   BarChart,
   CartesianGrid,
@@ -18,8 +29,9 @@ import { getCategoryBreakdown, getSalesByDay, getSalesSummary, getTopSellingItem
 import { useAuth } from '../context/AuthContext.jsx'
 
 const currency = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 })
-const primaryColor = '#EA580C'
-const paymentColors = ['#EA580C', '#16A34A', '#F59E0B']
+const primaryColor = '#6F4E37'
+const accentColor = '#C98A52'
+const paymentColors = ['#6F4E37', '#C98A52', '#4F8A5A']
 
 function money(value) {
   return currency.format(Number(value) || 0)
@@ -49,6 +61,7 @@ function Analytics() {
 
   useEffect(() => {
     let active = true
+    setLoading(true)
     Promise.all([
       getSalesSummary(range.from, range.to),
       getSalesByDay(range.from, range.to),
@@ -58,23 +71,30 @@ function Analytics() {
       .then(([summaryResponse, dailyResponse, itemsResponse, categoryResponse]) => {
         if (!active) return
         setSummary(summaryResponse.data.data)
-        setSalesByDay(dailyResponse.data.data)
-        setTopItems(itemsResponse.data.data)
-        setCategories(categoryResponse.data.data)
+        setSalesByDay(dailyResponse.data.data || [])
+        setTopItems(itemsResponse.data.data || [])
+        setCategories(categoryResponse.data.data || [])
         setError('')
       })
       .catch((requestError) => {
         if (active) setError(requestError.response?.data?.message || 'Unable to load analytics')
       })
-      .finally(() => { if (active) setLoading(false) })
-    return () => { active = false }
+      .finally(() => {
+        if (active) setLoading(false)
+      })
+    return () => {
+      active = false
+    }
   }, [branchId, range.from, range.to])
 
-  const paymentData = useMemo(() => [
-    { name: 'Cash', value: Number(summary?.paymentModeBreakdown?.cash) || 0 },
-    { name: 'Card', value: Number(summary?.paymentModeBreakdown?.card) || 0 },
-    { name: 'UPI', value: Number(summary?.paymentModeBreakdown?.upi) || 0 }
-  ], [summary])
+  const paymentData = useMemo(
+    () => [
+      { name: 'Cash', value: Number(summary?.paymentModeBreakdown?.cash) || 0 },
+      { name: 'Card', value: Number(summary?.paymentModeBreakdown?.card) || 0 },
+      { name: 'UPI', value: Number(summary?.paymentModeBreakdown?.upi) || 0 }
+    ],
+    [summary]
+  )
 
   const applyQuickRange = (days) => {
     setRange(rangeFor(days))
@@ -83,28 +103,247 @@ function Analytics() {
 
   const hasData = Boolean(summary?.totalBills || salesByDay.length || topItems.length || categories.length)
 
-  return <main className="mx-auto max-w-6xl p-6">
-    <h1 className="mb-2 text-2xl font-bold text-secondary">Analytics</h1>
-    <div className="mb-6 flex flex-wrap items-end gap-3">
-      <label className="text-sm text-gray-600">From<input className="input-field mt-1" onChange={(event) => { setRange((current) => ({ ...current, from: event.target.value })); setActiveRange('') }} type="date" value={range.from} /></label>
-      <label className="text-sm text-gray-600">To<input className="input-field mt-1" onChange={(event) => { setRange((current) => ({ ...current, to: event.target.value })); setActiveRange('') }} type="date" value={range.to} /></label>
-      <div className="flex gap-2"><button className={`btn-secondary px-3 py-2 text-sm ${activeRange === '1' ? 'border-primary bg-primary/10 text-primary' : ''}`} onClick={() => applyQuickRange(1)} type="button">Today</button><button className={`btn-secondary px-3 py-2 text-sm ${activeRange === '7' ? 'border-primary bg-primary/10 text-primary' : ''}`} onClick={() => applyQuickRange(7)} type="button">Last 7 Days</button><button className={`btn-secondary px-3 py-2 text-sm ${activeRange === '30' ? 'border-primary bg-primary/10 text-primary' : ''}`} onClick={() => applyQuickRange(30)} type="button">Last 30 Days</button></div>
+  return (
+    <div className="space-y-6">
+      {/* Page Header */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-[#2B2118]">Sales &amp; Business Analytics</h1>
+          <p className="mt-1 text-sm text-[#7A7068]">
+            Revenue trend charts, popular dishes, category performance, and payment breakdown
+          </p>
+        </div>
+
+        {/* Date Filter Pills */}
+        <div className="flex items-center gap-1.5 rounded-xl border border-[#EBE7DF] bg-white p-1 shadow-2xs">
+          <button
+            type="button"
+            onClick={() => applyQuickRange(1)}
+            className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
+              activeRange === '1'
+                ? 'bg-[#6F4E37] text-white shadow-xs'
+                : 'text-[#7A7068] hover:text-[#2B2118]'
+            }`}
+          >
+            Today
+          </button>
+          <button
+            type="button"
+            onClick={() => applyQuickRange(7)}
+            className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
+              activeRange === '7'
+                ? 'bg-[#6F4E37] text-white shadow-xs'
+                : 'text-[#7A7068] hover:text-[#2B2118]'
+            }`}
+          >
+            7 Days
+          </button>
+          <button
+            type="button"
+            onClick={() => applyQuickRange(30)}
+            className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
+              activeRange === '30'
+                ? 'bg-[#6F4E37] text-white shadow-xs'
+                : 'text-[#7A7068] hover:text-[#2B2118]'
+            }`}
+          >
+            30 Days
+          </button>
+        </div>
+      </div>
+
+      {/* Date Pickers */}
+      <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-[#EBE7DF] bg-white p-3.5 shadow-xs">
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-semibold uppercase tracking-wider text-[#7A7068]">From</span>
+          <input
+            type="date"
+            value={range.from}
+            onChange={(e) => {
+              setRange((curr) => ({ ...curr, from: e.target.value }))
+              setActiveRange('')
+            }}
+            className="rounded-xl border border-[#EBE7DF] bg-[#F7F5F2] px-3 py-1.5 text-xs font-medium text-[#2B2118] focus:bg-white focus:border-[#6F4E37] focus:outline-none"
+          />
+        </div>
+
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-semibold uppercase tracking-wider text-[#7A7068]">To</span>
+          <input
+            type="date"
+            value={range.to}
+            onChange={(e) => {
+              setRange((curr) => ({ ...curr, to: e.target.value }))
+              setActiveRange('')
+            }}
+            className="rounded-xl border border-[#EBE7DF] bg-[#F7F5F2] px-3 py-1.5 text-xs font-medium text-[#2B2118] focus:bg-white focus:border-[#6F4E37] focus:outline-none"
+          />
+        </div>
+      </div>
+
+      {error && (
+        <div className="flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-[#C75C5C]">
+          <AlertCircle size={18} />
+          <span>{error}</span>
+        </div>
+      )}
+
+      {loading ? (
+        <div className="py-16 text-center text-sm text-[#7A7068]">Crunching café report numbers...</div>
+      ) : (
+        <>
+          {/* KPI Summary Cards */}
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+            <div className="rounded-2xl border border-[#EBE7DF] bg-white p-5 shadow-xs">
+              <span className="text-xs font-semibold uppercase tracking-wider text-[#7A7068]">
+                Total Revenue
+              </span>
+              <p className="mt-1 text-2xl font-extrabold text-[#6F4E37]">
+                {money(summary?.totalRevenue)}
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-[#EBE7DF] bg-white p-5 shadow-xs">
+              <span className="text-xs font-semibold uppercase tracking-wider text-[#7A7068]">
+                Settled Bills
+              </span>
+              <p className="mt-1 text-2xl font-extrabold text-[#2B2118]">
+                {summary?.totalBills || 0}
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-[#EBE7DF] bg-white p-5 shadow-xs">
+              <span className="text-xs font-semibold uppercase tracking-wider text-[#7A7068]">
+                Average Ticket Size
+              </span>
+              <p className="mt-1 text-2xl font-extrabold text-[#2B2118]">
+                {money(summary?.avgBillValue)}
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-[#EBE7DF] bg-white p-5 shadow-xs">
+              <span className="text-xs font-semibold uppercase tracking-wider text-[#7A7068]">
+                Tax Collected (GST)
+              </span>
+              <p className="mt-1 text-2xl font-extrabold text-[#4F8A5A]">
+                {money((Number(summary?.totalTax?.cgst) || 0) + (Number(summary?.totalTax?.sgst) || 0))}
+              </p>
+            </div>
+          </div>
+
+          {!hasData ? (
+            <div className="rounded-2xl border border-dashed border-[#EBE7DF] bg-white p-12 text-center text-sm text-[#7A7068]">
+              No sales or billing records available for this selected date range.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+              {/* Daily Sales Trend Chart */}
+              <div className="rounded-2xl border border-[#EBE7DF] bg-white p-6 shadow-xs lg:col-span-2">
+                <div className="mb-4 flex items-center justify-between">
+                  <div>
+                    <h3 className="text-base font-bold text-[#2B2118]">Daily Revenue Trend</h3>
+                    <p className="text-xs text-[#7A7068]">Gross sales across the period</p>
+                  </div>
+                </div>
+                <ResponsiveContainer height={260} width="100%">
+                  <LineChart data={salesByDay}>
+                    <CartesianGrid stroke="#EBE7DF" strokeDasharray="3 3" />
+                    <XAxis dataKey="date" tick={{ fill: '#7A7068', fontSize: 12 }} />
+                    <YAxis
+                      tick={{ fill: '#7A7068', fontSize: 12 }}
+                      tickFormatter={(value) => `₹${value}`}
+                    />
+                    <Tooltip formatter={(value) => money(value)} />
+                    <Line
+                      dataKey="revenue"
+                      name="Revenue"
+                      stroke={primaryColor}
+                      strokeWidth={3}
+                      dot={{ r: 4, fill: primaryColor }}
+                      type="monotone"
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* Payment Methods Breakdown */}
+              <div className="rounded-2xl border border-[#EBE7DF] bg-white p-6 shadow-xs">
+                <h3 className="text-base font-bold text-[#2B2118] mb-1">Payment Modes</h3>
+                <p className="text-xs text-[#7A7068] mb-4">Distribution by payment type</p>
+                <ResponsiveContainer height={240} width="100%">
+                  <PieChart>
+                    <Pie
+                      data={paymentData}
+                      dataKey="value"
+                      nameKey="name"
+                      outerRadius={80}
+                      innerRadius={45}
+                      paddingAngle={4}
+                    >
+                      {paymentData.map((entry, index) => (
+                        <Cell fill={paymentColors[index]} key={entry.name} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(value) => money(value)} />
+                    <Legend
+                      formatter={(value, entry) => (
+                        <span className="text-xs text-[#2B2118]">
+                          {value}: <strong>{money(entry.payload.value)}</strong>
+                        </span>
+                      )}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* Top Selling Dishes */}
+              <div className="rounded-2xl border border-[#EBE7DF] bg-white p-6 shadow-xs">
+                <h3 className="text-base font-bold text-[#2B2118] mb-1">Top Selling Items</h3>
+                <p className="text-xs text-[#7A7068] mb-4">Volume by units sold</p>
+                <ResponsiveContainer height={240} width="100%">
+                  <BarChart data={topItems} layout="vertical" margin={{ left: 10, right: 10 }}>
+                    <CartesianGrid stroke="#EBE7DF" strokeDasharray="3 3" />
+                    <XAxis allowDecimals={false} type="number" tick={{ fill: '#7A7068', fontSize: 11 }} />
+                    <YAxis dataKey="name" type="category" width={85} tick={{ fill: '#2B2118', fontSize: 11 }} />
+                    <Tooltip />
+                    <Bar dataKey="totalQty" fill={accentColor} radius={[0, 6, 6, 0]} name="Units Sold" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* Revenue by Category */}
+              <div className="rounded-2xl border border-[#EBE7DF] bg-white p-6 shadow-xs lg:col-span-2">
+                <h3 className="text-base font-bold text-[#2B2118] mb-1">Revenue by Category</h3>
+                <p className="text-xs text-[#7A7068] mb-4">Category contribution to overall gross sales</p>
+                <div className="space-y-4">
+                  {categories.length > 0 ? (
+                    categories.map((category) => (
+                      <div key={category.categoryName} className="space-y-1.5">
+                        <div className="flex items-center justify-between text-xs font-semibold">
+                          <span className="text-[#2B2118]">{category.categoryName}</span>
+                          <span className="text-[#6F4E37]">
+                            {Number(category.percentage || 0).toFixed(1)}% ({money(category.totalRevenue)})
+                          </span>
+                        </div>
+                        <div className="h-2.5 w-full rounded-full bg-[#F7F5F2] overflow-hidden">
+                          <div
+                            className="h-full rounded-full bg-[#6F4E37] transition-all duration-500"
+                            style={{ width: `${Math.min(Number(category.percentage) || 0, 100)}%` }}
+                          />
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-xs text-[#7A7068]">No category data for this date range.</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </>
+      )}
     </div>
-
-    {error && <p className="mb-6 rounded-lg border border-danger bg-red-50 p-3 text-sm text-danger">{error}</p>}
-    {loading ? <p className="py-12 text-center text-gray-500">Loading...</p> : <>
-      <section className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
-        {[['Total Revenue', money(summary?.totalRevenue)], ['Total Bills', summary?.totalBills || 0], ['Avg Bill Value', money(summary?.avgBillValue)], ['Total Tax Collected', money((Number(summary?.totalTax?.cgst) || 0) + (Number(summary?.totalTax?.sgst) || 0))]].map(([label, value]) => <article className="card p-4" key={label}><p className="text-sm text-gray-500">{label}</p><p className="mt-1 text-2xl font-bold text-secondary">{value}</p></article>)}
-      </section>
-
-      {!hasData ? <div className="card py-16 text-center text-gray-500">No analytics data for this date range.</div> : <section className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <article className="card p-4 lg:col-span-2"><h2 className="mb-4 font-semibold text-secondary">Revenue Trend</h2><ResponsiveContainer height={250} width="100%"><LineChart data={salesByDay}><CartesianGrid stroke="#E5E7EB" strokeDasharray="3 3" /><XAxis dataKey="date" /><YAxis tickFormatter={(value) => `₹${value}`} /><Tooltip formatter={(value) => money(value)} /><Line dataKey="revenue" dot={{ r: 3 }} name="Revenue" stroke={primaryColor} strokeWidth={3} type="monotone" /></LineChart></ResponsiveContainer></article>
-        <article className="card p-4"><h2 className="mb-4 font-semibold text-secondary">Payment Methods</h2><ResponsiveContainer height={250} width="100%"><PieChart><Pie data={paymentData} dataKey="value" nameKey="name" outerRadius={82} label>{paymentData.map((entry, index) => <Cell fill={paymentColors[index]} key={entry.name} />)}</Pie><Tooltip formatter={(value) => money(value)} /><Legend formatter={(value, entry) => `${value}: ${money(entry.payload.value)}`} /></PieChart></ResponsiveContainer></article>
-        <article className="card p-4"><h2 className="mb-4 font-semibold text-secondary">Top Selling Items</h2><ResponsiveContainer height={250} width="100%"><BarChart data={topItems} layout="vertical" margin={{ left: 12, right: 12 }}><CartesianGrid stroke="#E5E7EB" strokeDasharray="3 3" /><XAxis allowDecimals={false} type="number" /><YAxis dataKey="name" type="category" width={80} /><Tooltip /><Bar dataKey="totalQty" fill={primaryColor} name="Quantity" /></BarChart></ResponsiveContainer></article>
-        <article className="card p-4 lg:col-span-2"><h2 className="mb-4 font-semibold text-secondary">Revenue by Category</h2><div className="space-y-4">{categories.length ? categories.map((category) => <div className="flex items-center gap-3" key={category.categoryName}><span className="w-28 shrink-0 truncate text-sm text-gray-600">{category.categoryName}</span><div className="h-3 flex-1 rounded-full bg-gray-100"><div className="h-3 rounded-full bg-primary" style={{ width: `${Math.min(Number(category.percentage) || 0, 100)}%` }} /></div><span className="w-28 shrink-0 text-right text-sm text-gray-600">{Number(category.percentage || 0).toFixed(1)}% · {money(category.totalRevenue)}</span></div>) : <p className="text-sm text-gray-500">No category data for this date range.</p>}</div></article>
-      </section>}
-    </>}
-  </main>
+  )
 }
 
 export default Analytics
