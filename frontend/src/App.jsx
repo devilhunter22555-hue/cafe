@@ -27,28 +27,30 @@ function App() {
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
       <Route element={<ProtectedRoute />}>
-        <Route element={<AppLayout />}>
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/dashboard/menu" element={<MenuManagement />} />
-          <Route path="/dashboard/tables" element={<TableManagement />} />
-          <Route path="/dashboard/pos" element={<POS />} />
-          <Route path="/dashboard/kitchen" element={<KitchenDisplay />} />
-          <Route path="/dashboard/billing" element={<Billing />} />
-          <Route path="/dashboard/bills" element={<BillHistory />} />
-          <Route path="/dashboard/analytics" element={<Analytics />} />
-          <Route path="/dashboard/inventory" element={<Inventory />} />
-          <Route path="/dashboard/staff" element={<StaffManagement />} />
-          <Route path="/dashboard/suppliers" element={<Suppliers />} />
-          <Route path="/dashboard/purchase-orders" element={<PurchaseOrders />} />
-          <Route path="/dashboard/insights" element={<Insights />} />
-          <Route path="/dashboard/customers" element={<Customers />} />
-          <Route path="/dashboard/coupons" element={<Coupons />} />
-          <Route path="/dashboard/salary" element={<SalaryManagement />} />
-          <Route path="/dashboard/my-salary" element={<MySalary />} />
-          <Route path="/menu" element={<Navigate to="/dashboard/menu" replace />} />
-          <Route path="/tables" element={<Navigate to="/dashboard/tables" replace />} />
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        {/* Layout Route with persistent sidebar + <Outlet /> */}
+        <Route path="/dashboard" element={<AppLayout />}>
+          <Route index element={<Dashboard />} />
+          <Route path="menu" element={<MenuManagement />} />
+          <Route path="tables" element={<TableManagement />} />
+          <Route path="pos" element={<POS />} />
+          <Route path="kitchen" element={<KitchenDisplay />} />
+          <Route path="billing" element={<Billing />} />
+          <Route path="bills" element={<BillHistory />} />
+          <Route path="analytics" element={<Analytics />} />
+          <Route path="inventory" element={<Inventory />} />
+          <Route path="staff" element={<StaffManagement />} />
+          <Route path="suppliers" element={<Suppliers />} />
+          <Route path="purchase-orders" element={<PurchaseOrders />} />
+          <Route path="insights" element={<Insights />} />
+          <Route path="customers" element={<Customers />} />
+          <Route path="coupons" element={<Coupons />} />
+          <Route path="salary" element={<SalaryManagement />} />
+          <Route path="my-salary" element={<MySalary />} />
         </Route>
+        {/* Legacy redirect aliases */}
+        <Route path="/menu" element={<Navigate to="/dashboard/menu" replace />} />
+        <Route path="/tables" element={<Navigate to="/dashboard/tables" replace />} />
+        <Route path="/" element={<Navigate to="/dashboard" replace />} />
       </Route>
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>

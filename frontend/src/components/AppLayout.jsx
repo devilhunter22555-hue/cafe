@@ -144,14 +144,20 @@ function AppLayout() {
   const visibleSections = navSections
     .map((section) => ({
       ...section,
-      items: section.items.filter((item) => !item.roles || item.roles.includes(role)),
+      items: section.items.filter((item) => {
+        if (!item.roles) return true
+        if (!role) return true
+        return item.roles.includes(role)
+      }),
     }))
     .filter((section) => section.items.length > 0)
 
   // Full-bleed mode for POS and KitchenDisplay to preserve dedicated edge-to-edge workspaces
   const isFullBleed =
-    location.pathname.startsWith('/dashboard/pos') ||
-    location.pathname.startsWith('/dashboard/kitchen')
+    location.pathname === '/dashboard/pos' ||
+    location.pathname === '/dashboard/kitchen' ||
+    location.pathname.startsWith('/dashboard/pos/') ||
+    location.pathname.startsWith('/dashboard/kitchen/')
 
   return (
     <div className="flex h-screen w-full overflow-hidden bg-canvas">
