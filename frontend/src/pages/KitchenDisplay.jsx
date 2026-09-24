@@ -112,7 +112,7 @@ function KitchenDisplay() {
     }
   }
 
-  return <main className="min-h-screen bg-gray-100 p-6">
+  return <div className="min-h-full bg-canvas p-8">
     <header className="mb-6 flex items-center justify-between">
       <h1 className="text-3xl font-bold text-secondary">Kitchen Display</h1>
       <div className="flex items-center gap-2"><span className="h-2.5 w-2.5 animate-pulse rounded-full bg-success" /><span className="text-sm text-gray-500">Live</span></div>
@@ -130,7 +130,7 @@ function KitchenDisplay() {
         </div>)}</div>
       </article>)}
     </section> : <div className="flex min-h-[60vh] flex-col items-center justify-center"><ChefHat className="text-gray-300" size={48} /><p className="text-lg text-gray-400">No active orders right now</p></div>}
-  </main>
+  </div>
 }
 
 export default KitchenDisplay

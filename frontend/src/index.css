@@ -5,8 +5,8 @@
 @layer base {
   :root {
     font-family: 'DM Sans', 'Trebuchet MS', sans-serif;
-    color: #1E293B;
-    background: #fff7ed;
+    color: #0F172A;
+    background: #F8FAFC;
     font-synthesis: none;
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
@@ -16,18 +16,20 @@
     margin: 0;
     min-width: 320px;
     min-height: 100vh;
+    background-color: #F8FAFC;
+    color: #0F172A;
   }
 }
 
 @layer components {
-  .btn-primary { @apply rounded-lg bg-primary px-4 py-2 text-white transition hover:bg-orange-700; }
-  .btn-secondary { @apply rounded-lg border border-slate-300 bg-white px-4 py-2 text-secondary transition hover:bg-slate-50; }
-  .btn-danger { @apply rounded-lg bg-danger px-4 py-2 text-white transition hover:bg-red-700; }
-  .card { @apply rounded-xl bg-white p-4 shadow-md; }
-  .input-field { @apply w-full rounded-lg border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary; }
-  .badge-success { @apply rounded-full bg-green-100 px-2 py-1 text-xs font-medium text-green-800; }
-  .badge-danger { @apply rounded-full bg-red-100 px-2 py-1 text-xs font-medium text-red-800; }
-  .badge-warning { @apply rounded-full bg-amber-100 px-2 py-1 text-xs font-medium text-amber-800; }
+  .btn-primary { @apply rounded-xl bg-primary px-5 py-2.5 font-medium text-white shadow-sm transition-all hover:bg-primary-dark active:scale-[0.98]; }
+  .btn-secondary { @apply rounded-xl border border-gray-200 bg-white px-5 py-2.5 font-medium text-secondary shadow-sm transition-all hover:bg-gray-50 active:scale-[0.98]; }
+  .btn-danger { @apply rounded-xl bg-danger px-5 py-2.5 font-medium text-white shadow-sm transition-all hover:bg-red-700 active:scale-[0.98]; }
+  .card { @apply rounded-2xl border border-gray-100 bg-white p-6 shadow-sm; }
+  .input-field { @apply w-full rounded-xl border border-gray-200 px-4 py-2.5 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20; }
+  .badge-success { @apply rounded-full bg-green-100 px-2.5 py-1 text-xs font-medium text-green-800; }
+  .badge-danger { @apply rounded-full bg-red-100 px-2.5 py-1 text-xs font-medium text-red-800; }
+  .badge-warning { @apply rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-800; }
 }
 
 @media print {
