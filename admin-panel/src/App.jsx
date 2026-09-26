@@ -5,6 +5,7 @@ import Login from './pages/Login.jsx'
 import Dashboard from './pages/Dashboard.jsx'
 import RestaurantDetails from './pages/RestaurantDetails.jsx'
 import SubscriptionPlans from './pages/SubscriptionPlans.jsx'
+import Settings from './pages/Settings.jsx'
 
 function App() {
   return (
@@ -15,6 +16,7 @@ function App() {
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/dashboard/restaurants/:id" element={<RestaurantDetails />} />
           <Route path="/dashboard/plans" element={<SubscriptionPlans />} />
+          <Route path="/dashboard/settings" element={<Settings />} />
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
         </Route>
       </Route>

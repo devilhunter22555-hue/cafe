@@ -1,17 +1,30 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   AlertCircle,
+  Building2,
   Check,
   CheckCircle2,
   CreditCard,
+  IndianRupee,
   Layers,
   LoaderCircle,
   Pencil,
   Plus,
+  Sparkles,
   Trash2,
-  X
+  Users,
 } from 'lucide-react'
 import { createPlan, deletePlan, getPlans, updatePlan } from '../api/adminApi.js'
+import {
+  ConfirmDialog,
+  EmptyState,
+  LoadingState,
+  Modal,
+  SearchBar,
+  StatCard,
+  StatusBadge,
+  Toast,
+} from '../components/ui/AdminUI.jsx'
 
 const emptyForm = {
   name: '',
@@ -19,7 +32,7 @@ const emptyForm = {
   maxBranches: '',
   maxStaff: '',
   features: '',
-  isActive: true
+  isActive: true,
 }
 
 function SubscriptionPlans() {
@@ -27,31 +40,39 @@ function SubscriptionPlans() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
-  const [notice, setNotice] = useState('')
+  const [toast, setToast] = useState({ message: '', type: 'success' })
   const [form, setForm] = useState(emptyForm)
   const [editingId, setEditingId] = useState(null)
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [confirmDeletePlan, setConfirmDeletePlan] = useState(null)
+  const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState('all')
 
-  const fetchPlans = async () => {
+  const fetchPlans = useCallback(async () => {
     try {
+      setLoading(true)
       const response = await getPlans()
       setPlans(response.data || [])
       setError('')
     } catch (fetchError) {
-      setError(fetchError.response?.data?.message || 'Unable to load subscription plans.')
+      setError(
+        fetchError.response?.data?.message ||
+          'Unable to load subscription plans.'
+      )
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
 
   useEffect(() => {
     fetchPlans()
-  }, [])
+  }, [fetchPlans])
 
   const handleChange = (event) => {
     const { name, value, type, checked } = event.target
     setForm((current) => ({
       ...current,
-      [name]: type === 'checkbox' ? checked : value
+      [name]: type === 'checkbox' ? checked : value,
     }))
   }
 
@@ -60,10 +81,27 @@ function SubscriptionPlans() {
     setEditingId(null)
   }
 
+  const openCreateModal = () => {
+    resetForm()
+    setIsModalOpen(true)
+  }
+
+  const handleEdit = (plan) => {
+    setEditingId(plan._id)
+    setForm({
+      name: plan.name || '',
+      price: plan.price ?? '',
+      maxBranches: plan.maxBranches ?? '',
+      maxStaff: plan.maxStaff ?? '',
+      features: (plan.features || []).join(', '),
+      isActive: plan.isActive !== false,
+    })
+    setIsModalOpen(true)
+  }
+
   const handleSubmit = async (event) => {
     event.preventDefault()
     setSaving(true)
-    setNotice('')
 
     try {
       const payload = {
@@ -75,7 +113,7 @@ function SubscriptionPlans() {
           .split(',')
           .map((item) => item.trim())
           .filter(Boolean),
-        isActive: form.isActive
+        isActive: form.isActive,
       }
 
       if (
@@ -84,7 +122,7 @@ function SubscriptionPlans() {
         Number.isNaN(payload.maxBranches) ||
         Number.isNaN(payload.maxStaff)
       ) {
-        throw new Error('Please complete all plan fields before saving.')
+        throw new Error('Please complete all required plan fields before saving.')
       }
 
       if (editingId) {
@@ -92,136 +130,335 @@ function SubscriptionPlans() {
         setPlans((current) =>
           current.map((plan) => (plan._id === editingId ? response.data : plan))
         )
-        setNotice(`Plan "${response.data.name}" updated successfully.`)
+        setToast({
+          message: `Plan "${response.data.name}" updated successfully.`,
+          type: 'success',
+        })
       } else {
         const response = await createPlan(payload)
         setPlans((current) => [...current, response.data])
-        setNotice(`Plan "${response.data.name}" created successfully.`)
+        setToast({
+          message: `Plan "${response.data.name}" created successfully.`,
+          type: 'success',
+        })
       }
 
       resetForm()
+      setIsModalOpen(false)
     } catch (submitError) {
-      setNotice(submitError.response?.data?.message || submitError.message || 'Unable to save plan.')
+      setToast({
+        message:
+          submitError.response?.data?.message ||
+          submitError.message ||
+          'Unable to save subscription plan.',
+        type: 'error',
+      })
     } finally {
       setSaving(false)
     }
   }
 
-  const handleEdit = (plan) => {
-    setEditingId(plan._id)
-    setForm({
-      name: plan.name || '',
-      price: plan.price ?? '',
-      maxBranches: plan.maxBranches ?? '',
-      maxStaff: plan.maxStaff ?? '',
-      features: (plan.features || []).join(', '),
-      isActive: plan.isActive !== false
-    })
-  }
-
-  const handleDelete = async (id, name) => {
-    if (!window.confirm(`Delete plan "${name}"?`)) return
+  const handleDelete = async () => {
+    if (!confirmDeletePlan) return
+    setSaving(true)
 
     try {
-      await deletePlan(id)
-      setPlans((current) => current.filter((plan) => plan._id !== id))
-      setNotice('Plan removed successfully.')
-      if (editingId === id) resetForm()
+      await deletePlan(confirmDeletePlan._id)
+      setPlans((current) =>
+        current.filter((plan) => plan._id !== confirmDeletePlan._id)
+      )
+      setToast({
+        message: `Plan "${confirmDeletePlan.name}" deleted.`,
+        type: 'success',
+      })
+      if (editingId === confirmDeletePlan._id) resetForm()
+      setConfirmDeletePlan(null)
     } catch (deleteError) {
-      setNotice(deleteError.response?.data?.message || 'Unable to delete plan.')
+      setToast({
+        message:
+          deleteError.response?.data?.message || 'Unable to delete plan.',
+        type: 'error',
+      })
+      setConfirmDeletePlan(null)
+    } finally {
+      setSaving(false)
     }
   }
 
-  const activePlansCount = plans.filter((p) => p.isActive !== false).length
+  const stats = useMemo(() => {
+    const total = plans.length
+    const active = plans.filter((p) => p.isActive !== false).length
+    const avgPrice =
+      total > 0
+        ? Math.round(
+            plans.reduce((sum, p) => sum + (Number(p.price) || 0), 0) / total
+          )
+        : 0
+    return { total, active, avgPrice }
+  }, [plans])
+
+  const filteredPlans = useMemo(() => {
+    return plans.filter((p) => {
+      const isPlanActive = p.isActive !== false
+      if (statusFilter === 'active' && !isPlanActive) return false
+      if (statusFilter === 'disabled' && isPlanActive) return false
+      if (search.trim()) {
+        const q = search.toLowerCase()
+        const matchName = p.name?.toLowerCase().includes(q)
+        const matchFeat = (p.features || []).some((f) =>
+          f.toLowerCase().includes(q)
+        )
+        if (!matchName && !matchFeat) return false
+      }
+      return true
+    })
+  }, [plans, search, statusFilter])
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight text-[#2B2118]">Subscription Tiers</h1>
-        <p className="mt-1 text-sm text-[#7A7068]">
-          Configure SaaS subscription tiers, pricing, branch &amp; staff limits, and feature entitlements
-        </p>
+    <div className="space-y-8">
+      <Toast
+        message={toast.message}
+        type={toast.type}
+        onClose={() => setToast({ message: '', type: 'success' })}
+      />
+
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#6F4E37]/10 text-[#6F4E37]">
+              <CreditCard size={20} />
+            </div>
+            <div>
+              <h1 className="text-2xl font-extrabold tracking-tight text-[#241B15]">
+                Subscription Plans &amp; Tiers
+              </h1>
+              <p className="text-xs text-[#81766D]">
+                Configure SaaS pricing tiers, branch &amp; staff quotas, and feature entitlements
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={openCreateModal}
+          className="btn-primary self-start sm:self-auto"
+        >
+          <Plus size={16} />
+          <span>Create Plan Tier</span>
+        </button>
       </div>
 
-      {notice && (
-        <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-xs font-semibold text-emerald-800">
-          <CheckCircle2 size={16} />
-          <span>{notice}</span>
-        </div>
-      )}
-
       {error && (
-        <div className="flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-[#C75C5C]">
+        <div className="flex items-center gap-2.5 rounded-2xl border border-[#C75C5C]/30 bg-[#C75C5C]/10 p-4 text-sm font-medium text-[#C75C5C]">
           <AlertCircle size={18} />
           <span>{error}</span>
         </div>
       )}
 
-      {/* KPI Stats */}
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-        <div className="rounded-2xl border border-[#EBE7DF] bg-white p-5 shadow-xs">
-          <span className="text-xs font-semibold uppercase tracking-wider text-[#7A7068]">
-            Defined Tiers
-          </span>
-          <p className="mt-1 text-2xl font-extrabold text-[#2B2118]">{plans.length}</p>
-        </div>
-
-        <div className="rounded-2xl border border-[#EBE7DF] bg-white p-5 shadow-xs">
-          <span className="text-xs font-semibold uppercase tracking-wider text-[#7A7068]">
-            Active for Signups
-          </span>
-          <p className="mt-1 text-2xl font-extrabold text-[#4F8A5A]">{activePlansCount}</p>
-        </div>
-
-        <div className="rounded-2xl border border-[#EBE7DF] bg-white p-5 shadow-xs col-span-2 sm:col-span-1">
-          <span className="text-xs font-semibold uppercase tracking-wider text-[#7A7068]">
-            Billing Frequency
-          </span>
-          <p className="mt-1 text-2xl font-extrabold text-[#6F4E37]">Monthly Recurring</p>
-        </div>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <StatCard
+          title="Defined Tiers"
+          value={stats.total}
+          subtitle="Total subscription plans in catalog"
+          icon={Layers}
+          tone="coffee"
+          loading={loading}
+        />
+        <StatCard
+          title="Active for Signups"
+          value={stats.active}
+          badge={stats.active > 0 ? 'Enabled' : undefined}
+          subtitle="Available for café tenant assignment"
+          icon={CheckCircle2}
+          tone="success"
+          loading={loading}
+        />
+        <StatCard
+          title="Average Monthly Fee"
+          value={`₹${stats.avgPrice.toLocaleString('en-IN')}`}
+          subtitle="Recurring monthly billing cycle"
+          icon={IndianRupee}
+          tone="accent"
+          loading={loading}
+        />
       </div>
 
-      {/* Main Grid: Form + Plans Catalog */}
-      <div className="grid gap-6 lg:grid-cols-[0.9fr_1.3fr]">
-        {/* Plan Form */}
-        <form
-          onSubmit={handleSubmit}
-          className="rounded-2xl border border-[#EBE7DF] bg-white p-6 shadow-xs space-y-4 h-fit"
-        >
-          <div className="flex items-center justify-between border-b border-[#F7F5F2] pb-3">
-            <h2 className="text-base font-bold text-[#2B2118]">
-              {editingId ? 'Edit Plan Tier' : 'Create New Tier'}
-            </h2>
-            {editingId && (
-              <button
-                type="button"
-                onClick={resetForm}
-                className="text-xs font-semibold text-[#6F4E37] hover:underline"
-              >
-                Cancel Edit
-              </button>
-            )}
-          </div>
+      <div className="card flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="inline-flex rounded-xl border border-[#E8E1DA] bg-[#F7F5F2] p-1 self-start sm:self-auto">
+          {[
+            { id: 'all', label: `All Plans (${stats.total})` },
+            { id: 'active', label: `Active (${stats.active})` },
+            { id: 'disabled', label: `Disabled (${stats.total - stats.active})` },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setStatusFilter(tab.id)}
+              className={`rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-all ${
+                statusFilter === tab.id
+                  ? 'bg-white text-[#6F4E37] shadow-2xs font-bold'
+                  : 'text-[#81766D] hover:text-[#241B15]'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
 
+        <SearchBar
+          value={search}
+          onChange={setSearch}
+          placeholder="Search plans or features..."
+          className="w-full sm:w-72"
+        />
+      </div>
+
+      {loading ? (
+        <LoadingState message="Loading subscription tiers..." rows={3} />
+      ) : filteredPlans.length === 0 ? (
+        <EmptyState
+          icon={CreditCard}
+          title="No subscription plans found"
+          description="Create your first pricing tier to define branch limits, staff quotas, and included POS features."
+          actionLabel="+ Create Plan Tier"
+          onAction={openCreateModal}
+        />
+      ) : (
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {filteredPlans.map((plan) => {
+            const isPlanActive = plan.isActive !== false
+            return (
+              <div
+                key={plan._id}
+                className="card-interactive flex flex-col justify-between p-6"
+              >
+                <div>
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <Sparkles size={15} className="text-[#C98A5B]" />
+                        <h3 className="text-lg font-extrabold text-[#241B15]">
+                          {plan.name}
+                        </h3>
+                      </div>
+                      <p className="mt-1 text-xs text-[#81766D]">
+                        Monthly recurring SaaS license
+                      </p>
+                    </div>
+
+                    <StatusBadge
+                      status={isPlanActive ? 'active' : 'disabled'}
+                      label={isPlanActive ? 'Active' : 'Disabled'}
+                    />
+                  </div>
+
+                  <div className="my-5 flex items-baseline gap-1 border-y border-[#F7F5F2] py-4">
+                    <span className="text-3xl font-extrabold tracking-tight text-[#6F4E37]">
+                      ₹{Number(plan.price || 0).toLocaleString('en-IN')}
+                    </span>
+                    <span className="text-xs font-medium text-[#81766D]">
+                      / month
+                    </span>
+                  </div>
+
+                  <div className="mb-4 grid grid-cols-2 gap-2.5">
+                    <div className="rounded-xl bg-[#F7F5F2] p-3 text-xs">
+                      <span className="flex items-center gap-1 text-[#81766D]">
+                        <Building2 size={12} className="text-[#6F4E37]" />
+                        <span>Max Branches</span>
+                      </span>
+                      <p className="mt-1 text-sm font-extrabold text-[#241B15]">
+                        Up to {plan.maxBranches}
+                      </p>
+                    </div>
+                    <div className="rounded-xl bg-[#F7F5F2] p-3 text-xs">
+                      <span className="flex items-center gap-1 text-[#81766D]">
+                        <Users size={12} className="text-[#C98A5B]" />
+                        <span>Max Staff</span>
+                      </span>
+                      <p className="mt-1 text-sm font-extrabold text-[#241B15]">
+                        Up to {plan.maxStaff}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-[#81766D]">
+                      Included Entitlements
+                    </p>
+                    {(plan.features || []).length > 0 ? (
+                      (plan.features || []).map((feat, idx) => (
+                        <div
+                          key={idx}
+                          className="flex items-start gap-2 text-xs text-[#241B15]"
+                        >
+                          <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-[#4F8A5A]/15 text-[#4F8A5A]">
+                            <Check size={10} />
+                          </span>
+                          <span>{feat}</span>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-xs text-[#81766D] italic">
+                        Standard POS &amp; dashboard features
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="mt-6 flex items-center justify-between gap-2 border-t border-[#F7F5F2] pt-4">
+                  <button
+                    type="button"
+                    onClick={() => handleEdit(plan)}
+                    className="btn-secondary flex-1 py-2 text-xs"
+                  >
+                    <Pencil size={13} className="text-[#6F4E37]" />
+                    <span>Edit Tier</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmDeletePlan(plan)}
+                    className="rounded-xl border border-[#E8E1DA] p-2 text-[#81766D] transition-colors hover:border-[#C75C5C]/30 hover:bg-[#C75C5C]/10 hover:text-[#C75C5C]"
+                    title="Delete Plan"
+                  >
+                    <Trash2 size={15} />
+                  </button>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      <Modal
+        open={isModalOpen}
+        onClose={() => {
+          setIsModalOpen(false)
+          resetForm()
+        }}
+        title={editingId ? 'Edit Subscription Tier' : 'Create Subscription Tier'}
+        subtitle="Configure pricing, branch & staff quotas, and included feature entitlements"
+      >
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-[#7A7068]">
-              Tier Name
+            <label className="block text-xs font-bold uppercase tracking-wider text-[#81766D]">
+              Tier Name *
             </label>
             <input
               name="name"
               value={form.name}
               onChange={handleChange}
-              placeholder="e.g. Starter, Pro, Enterprise"
+              placeholder="e.g. Starter, Basic, Pro, Enterprise"
               required
-              className="mt-1.5 w-full rounded-xl border border-[#EBE7DF] bg-[#F7F5F2] px-3.5 py-2.5 text-sm text-[#2B2118] focus:bg-white focus:border-[#6F4E37] focus:outline-none"
+              className="input-field mt-1.5"
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-[#7A7068]">
-                Monthly Fee (₹)
+              <label className="block text-xs font-bold uppercase tracking-wider text-[#81766D]">
+                Monthly Fee (₹) *
               </label>
               <input
                 name="price"
@@ -230,15 +467,15 @@ function SubscriptionPlans() {
                 step="0.01"
                 value={form.price}
                 onChange={handleChange}
-                placeholder="0"
+                placeholder="999"
                 required
-                className="mt-1.5 w-full rounded-xl border border-[#EBE7DF] bg-[#F7F5F2] px-3.5 py-2.5 text-sm text-[#2B2118] focus:bg-white focus:border-[#6F4E37] focus:outline-none"
+                className="input-field mt-1.5"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-[#7A7068]">
-                Max Branches
+              <label className="block text-xs font-bold uppercase tracking-wider text-[#81766D]">
+                Max Branches *
               </label>
               <input
                 name="maxBranches"
@@ -248,145 +485,87 @@ function SubscriptionPlans() {
                 onChange={handleChange}
                 placeholder="1"
                 required
-                className="mt-1.5 w-full rounded-xl border border-[#EBE7DF] bg-[#F7F5F2] px-3.5 py-2.5 text-sm text-[#2B2118] focus:bg-white focus:border-[#6F4E37] focus:outline-none"
+                className="input-field mt-1.5"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-[#81766D]">
+                Max Staff *
+              </label>
+              <input
+                name="maxStaff"
+                type="number"
+                min="1"
+                value={form.maxStaff}
+                onChange={handleChange}
+                placeholder="10"
+                required
+                className="input-field mt-1.5"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-[#7A7068]">
-              Max Staff Users
-            </label>
-            <input
-              name="maxStaff"
-              type="number"
-              min="1"
-              value={form.maxStaff}
-              onChange={handleChange}
-              placeholder="5"
-              required
-              className="mt-1.5 w-full rounded-xl border border-[#EBE7DF] bg-[#F7F5F2] px-3.5 py-2.5 text-sm text-[#2B2118] focus:bg-white focus:border-[#6F4E37] focus:outline-none"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-[#7A7068]">
-              Features (Comma separated)
+            <label className="block text-xs font-bold uppercase tracking-wider text-[#81766D]">
+              Included Features (Comma separated)
             </label>
             <textarea
               name="features"
               rows={3}
               value={form.features}
               onChange={handleChange}
-              placeholder="POS Terminal, Kitchen Display, Inventory Tracking, Loyalty CRM"
-              className="mt-1.5 w-full rounded-xl border border-[#EBE7DF] bg-[#F7F5F2] px-3.5 py-2.5 text-sm text-[#2B2118] focus:bg-white focus:border-[#6F4E37] focus:outline-none"
+              placeholder="POS Terminal, Kitchen Display, Inventory Tracking, Loyalty CRM, AI Insights"
+              className="input-field mt-1.5"
             />
           </div>
 
-          <label className="flex items-center gap-2 cursor-pointer pt-1 text-sm font-semibold text-[#2B2118]">
+          <label className="flex cursor-pointer items-center justify-between rounded-xl border border-[#E8E1DA] bg-[#F7F5F2] px-4 py-3 text-xs font-bold text-[#241B15]">
+            <span>Enable tier for new café subscriptions</span>
             <input
               type="checkbox"
               name="isActive"
               checked={form.isActive}
               onChange={handleChange}
-              className="h-4 w-4 rounded-md border-[#EBE7DF] text-[#6F4E37] focus:ring-[#6F4E37]"
+              className="h-4 w-4 accent-[#6F4E37]"
             />
-            <span>Active plan (Enabled for new subscriptions)</span>
           </label>
 
-          <button
-            type="submit"
-            disabled={saving}
-            className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-[#6F4E37] py-3 text-sm font-semibold text-white shadow-xs hover:bg-[#2B2118] transition-all disabled:opacity-60"
-          >
-            {saving ? (
-              <>
-                <LoaderCircle className="h-4 w-4 animate-spin" />
-                <span>Saving Tier...</span>
-              </>
-            ) : (
-              <>
-                {editingId ? <Pencil size={16} /> : <Plus size={16} />}
-                <span>{editingId ? 'Update Subscription Tier' : 'Create Subscription Tier'}</span>
-              </>
-            )}
-          </button>
+          <div className="flex items-center justify-end gap-3 border-t border-[#F7F5F2] pt-4">
+            <button
+              type="button"
+              onClick={() => {
+                setIsModalOpen(false)
+                resetForm()
+              }}
+              className="btn-secondary"
+            >
+              Cancel
+            </button>
+            <button type="submit" disabled={saving} className="btn-primary">
+              {saving ? (
+                <>
+                  <LoaderCircle size={15} className="animate-spin" />
+                  <span>Saving...</span>
+                </>
+              ) : (
+                <span>{editingId ? 'Save Changes' : 'Create Tier'}</span>
+              )}
+            </button>
+          </div>
         </form>
+      </Modal>
 
-        {/* Plans Catalog */}
-        <div className="space-y-4">
-          <h2 className="text-base font-bold text-[#2B2118]">Current Plan Catalog</h2>
-
-          {loading ? (
-            <div className="py-12 text-center text-sm text-[#7A7068]">Loading plans...</div>
-          ) : plans.length > 0 ? (
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              {plans.map((plan) => (
-                <div
-                  key={plan._id}
-                  className="flex flex-col justify-between rounded-2xl border border-[#EBE7DF] bg-white p-5 shadow-xs transition-all hover:border-[#6F4E37]/30"
-                >
-                  <div>
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <h3 className="text-lg font-bold text-[#2B2118]">{plan.name}</h3>
-                        <p className="mt-0.5 text-xs text-[#7A7068]">
-                          Up to {plan.maxBranches} branches • {plan.maxStaff} staff
-                        </p>
-                      </div>
-
-                      <span
-                        className={plan.isActive === false ? 'badge-danger' : 'badge-success'}
-                      >
-                        {plan.isActive === false ? 'Disabled' : 'Active'}
-                      </span>
-                    </div>
-
-                    <div className="my-4">
-                      <span className="text-3xl font-extrabold text-[#6F4E37]">
-                        ₹{Number(plan.price || 0).toLocaleString()}
-                      </span>
-                      <span className="text-xs text-[#7A7068]"> / month</span>
-                    </div>
-
-                    {/* Features List */}
-                    <div className="space-y-1.5 border-t border-[#F7F5F2] pt-3">
-                      {(plan.features || []).map((feat, idx) => (
-                        <div key={idx} className="flex items-center gap-2 text-xs text-[#2B2118]">
-                          <Check size={14} className="text-[#4F8A5A] shrink-0" />
-                          <span>{feat}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="mt-5 flex items-center justify-end gap-2 border-t border-[#F7F5F2] pt-3">
-                    <button
-                      type="button"
-                      onClick={() => handleEdit(plan)}
-                      className="rounded-lg bg-[#F7F5F2] px-3 py-1.5 text-xs font-semibold text-[#6F4E37] hover:bg-[#6F4E37] hover:text-white transition-all shadow-2xs"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleDelete(plan._id, plan.name)}
-                      className="rounded-lg p-1.5 text-gray-400 hover:bg-rose-50 hover:text-[#C75C5C] transition-colors"
-                      title="Delete Plan"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="rounded-2xl border border-dashed border-[#EBE7DF] bg-white p-8 text-center text-sm text-[#7A7068]">
-              No plans defined yet. Create your first subscription plan on the left.
-            </div>
-          )}
-        </div>
-      </div>
+      <ConfirmDialog
+        open={Boolean(confirmDeletePlan)}
+        onClose={() => setConfirmDeletePlan(null)}
+        onConfirm={handleDelete}
+        loading={saving}
+        variant="danger"
+        title={`Delete "${confirmDeletePlan?.name}" Plan?`}
+        description="This subscription plan tier will be permanently removed from the catalog."
+        confirmLabel="Delete Plan"
+      />
     </div>
   )
 }

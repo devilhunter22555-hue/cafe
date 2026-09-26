@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { useNavigate } from 'react-router-dom'
-import { AlertCircle, Lock, Mail, ShieldCheck } from 'lucide-react'
+import { AlertCircle, Coffee, Lock, Mail, ShieldCheck } from 'lucide-react'
 import { useAdminAuth } from '../context/AdminAuthContext.jsx'
 
 function Login() {
@@ -10,7 +10,7 @@ function Login() {
   const {
     register,
     handleSubmit,
-    formState: { errors }
+    formState: { errors },
   } = useForm()
   const [submitError, setSubmitError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -23,85 +23,108 @@ function Login() {
       await login(email, password)
       navigate('/dashboard')
     } catch (error) {
-      setSubmitError(error.response?.data?.message || 'Unable to sign in. Please verify your credentials.')
+      setSubmitError(
+        error.response?.data?.message ||
+          'Unable to sign in. Please verify your credentials.'
+      )
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[#F7F5F2] px-4 py-12">
-      <div className="w-full max-w-md rounded-3xl border border-[#EBE7DF] bg-white p-8 shadow-xl">
+    <main className="flex min-h-screen items-center justify-center bg-[#F7F5F2] px-4 py-12 text-[#241B15]">
+      <div className="w-full max-w-md rounded-2xl border border-[#E8E1DA] bg-white p-8 shadow-lg">
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#6F4E37] text-white shadow-md">
-            <ShieldCheck size={28} />
+          <div className="mx-auto mb-3.5 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#6F4E37] text-white shadow-sm">
+            <Coffee size={26} />
           </div>
-          <h1 className="text-2xl font-black tracking-tight text-[#2B2118]">
-            Super Admin Console
+          <span className="inline-flex items-center gap-1 rounded-full bg-[#6F4E37]/10 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-[#6F4E37]">
+            <ShieldCheck size={12} />
+            <span>Admin Console</span>
+          </span>
+          <h1 className="mt-2 text-2xl font-extrabold tracking-tight text-[#241B15]">
+            Café Management
           </h1>
-          <p className="mt-1 text-sm text-[#7A7068]">
-            SaaS Platform Oversight &amp; Tenant Management
+          <p className="mt-1 text-xs text-[#81766D]">
+            Sign in to manage café tenants, licenses, and subscription tiers
           </p>
         </div>
 
         {submitError && (
-          <div className="mb-5 flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 p-3.5 text-xs text-[#C75C5C]">
-            <AlertCircle size={16} />
+          <div className="mb-5 flex items-center gap-2 rounded-xl border border-[#C75C5C]/30 bg-[#C75C5C]/10 p-3.5 text-xs font-medium text-[#C75C5C]">
+            <AlertCircle size={16} className="shrink-0" />
             <span>{submitError}</span>
           </div>
         )}
 
         <form className="space-y-4" onSubmit={handleSubmit(onSubmit)}>
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-[#7A7068]" htmlFor="email">
+            <label
+              className="block text-xs font-bold uppercase tracking-wider text-[#81766D]"
+              htmlFor="email"
+            >
               Admin Email
             </label>
             <div className="relative mt-1.5">
-              <Mail className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+              <Mail
+                className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-[#81766D]"
+                size={16}
+              />
               <input
                 id="email"
-                className="w-full rounded-xl border border-[#EBE7DF] bg-[#F7F5F2] py-2.5 pl-10 pr-3.5 text-sm text-[#2B2118] placeholder:text-[#7A7068]/50 focus:bg-white focus:border-[#6F4E37] focus:outline-none focus:ring-2 focus:ring-[#6F4E37]/20"
+                className="input-field pl-10"
                 type="email"
                 placeholder="admin@platform.com"
                 {...register('email', {
                   required: 'Email is required',
                   pattern: {
                     value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
-                    message: 'Enter a valid email address'
-                  }
+                    message: 'Enter a valid email address',
+                  },
                 })}
               />
             </div>
             {errors.email && (
-              <span className="mt-1 block text-xs text-[#C75C5C]">{errors.email.message}</span>
+              <span className="mt-1 block text-xs font-medium text-[#C75C5C]">
+                {errors.email.message}
+              </span>
             )}
           </div>
 
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-[#7A7068]" htmlFor="password">
-              Master Password
+            <label
+              className="block text-xs font-bold uppercase tracking-wider text-[#81766D]"
+              htmlFor="password"
+            >
+              Password
             </label>
             <div className="relative mt-1.5">
-              <Lock className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+              <Lock
+                className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-[#81766D]"
+                size={16}
+              />
               <input
                 id="password"
-                className="w-full rounded-xl border border-[#EBE7DF] bg-[#F7F5F2] py-2.5 pl-10 pr-3.5 text-sm text-[#2B2118] placeholder:text-[#7A7068]/50 focus:bg-white focus:border-[#6F4E37] focus:outline-none focus:ring-2 focus:ring-[#6F4E37]/20"
+                className="input-field pl-10"
                 type="password"
                 placeholder="••••••••"
                 {...register('password', { required: 'Password is required' })}
               />
             </div>
             {errors.password && (
-              <span className="mt-1 block text-xs text-[#C75C5C]">{errors.password.message}</span>
+              <span className="mt-1 block text-xs font-medium text-[#C75C5C]">
+                {errors.password.message}
+              </span>
             )}
           </div>
 
           <button
             type="submit"
-            className="mt-6 w-full rounded-xl bg-[#6F4E37] py-3 text-sm font-bold text-white shadow-sm hover:bg-[#2B2118] transition-all active:scale-[0.98] disabled:opacity-60"
+            className="btn-primary mt-6 w-full py-3"
             disabled={loading}
           >
-            {loading ? 'Authenticating...' : 'Sign In as Platform Admin'}
+            {loading ? 'Authenticating...' : 'Sign In to Admin Console'}
           </button>
         </form>
       </div>
