@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const Restaurant = require('../models/Restaurant');
 const Branch = require('../models/Branch');
 const User = require('../models/User');
@@ -8,6 +9,92 @@ function createError(message, statusCode) {
   const error = new Error(message);
   error.statusCode = statusCode;
   return error;
+}
+
+function validatePassword(password) {
+  if (typeof password !== 'string') return false;
+  if (password.length < 8) return false;
+  if (!/[A-Za-z]/.test(password)) return false;
+  if (!/\d/.test(password)) return false;
+  return true;
+}
+
+async function createRestaurant(req, res, next) {
+  let session;
+  try {
+    const { restaurantName, ownerName, ownerEmail, ownerPassword, plan } = req.body;
+    if (!restaurantName || !ownerName || !ownerEmail || !ownerPassword) {
+      throw createError('restaurantName, ownerName, ownerEmail, and ownerPassword are required', 400);
+    }
+
+    const validPlans = ['trial', 'basic', 'pro'];
+    if (!plan || !validPlans.includes(plan)) {
+      throw createError('Valid plan is required: trial, basic, pro', 400);
+    }
+
+    if (!validatePassword(ownerPassword)) {
+      throw createError('Password must be at least 8 characters long and include at least one letter and one number', 400);
+    }
+
+    const existingUser = await User.findOne({ email: String(ownerEmail).toLowerCase().trim() });
+    if (existingUser) {
+      throw createError('A user with this email already exists', 409);
+    }
+
+    session = await mongoose.startSession();
+    let createdRestaurant;
+    let createdBranch;
+    let createdUser;
+
+    await session.withTransaction(async () => {
+      [createdRestaurant] = await Restaurant.create([
+        { name: restaurantName, plan }
+      ], { session });
+
+      [createdBranch] = await Branch.create([
+        { restaurantId: createdRestaurant._id, name: 'Main Branch' }
+      ], { session });
+
+      [createdUser] = await User.create([{
+        restaurantId: createdRestaurant._id,
+        branchId: createdBranch._id,
+        name: ownerName,
+        email: ownerEmail,
+        password: ownerPassword,
+        role: 'owner'
+      }], { session });
+
+      createdRestaurant.ownerId = createdUser._id;
+      await createdRestaurant.save({ session });
+    });
+
+    const ownerInfo = {
+      id: createdUser._id,
+      _id: createdUser._id,
+      name: createdUser.name,
+      email: createdUser.email,
+      role: createdUser.role,
+      restaurantId: createdUser.restaurantId,
+      branchId: createdUser.branchId
+    };
+
+    const restaurantData = createdRestaurant.toObject();
+
+    res.status(201).json({
+      success: true,
+      data: {
+        ...restaurantData,
+        restaurant: restaurantData,
+        owner: ownerInfo,
+        branch: createdBranch.toObject()
+      },
+      message: 'Restaurant created successfully'
+    });
+  } catch (error) {
+    next(error);
+  } finally {
+    if (session) await session.endSession();
+  }
 }
 
 async function getAllRestaurants(req, res, next) {
@@ -126,4 +213,10 @@ async function updateRestaurantPlan(req, res, next) {
   }
 }
 
-module.exports = { getAllRestaurants, getRestaurantDetails, updateRestaurantStatus, updateRestaurantPlan };
+module.exports = {
+  createRestaurant,
+  getAllRestaurants,
+  getRestaurantDetails,
+  updateRestaurantStatus,
+  updateRestaurantPlan
+};

@@ -51,6 +51,12 @@ function validatePassword(password) {
 }
 
 async function register(req, res, next) {
+  return res.status(403).json({
+    success: false,
+    data: null,
+    message: 'Public registration is disabled. Contact us to get started.'
+  });
+
   let session;
   try {
     session = await mongoose.startSession();

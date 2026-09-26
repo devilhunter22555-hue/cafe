@@ -2,6 +2,7 @@ const express = require('express');
 const superAdminMiddleware = require('../middleware/superAdminMiddleware');
 const { login } = require('../controllers/superAdminAuthController');
 const {
+  createRestaurant,
   getAllRestaurants,
   getRestaurantDetails,
   updateRestaurantStatus,
@@ -17,6 +18,7 @@ const {
 const router = express.Router();
 
 router.post('/login', login);
+router.post('/restaurants', superAdminMiddleware, createRestaurant);
 router.get('/restaurants', superAdminMiddleware, getAllRestaurants);
 router.get('/restaurants/:id', superAdminMiddleware, getRestaurantDetails);
 router.patch('/restaurants/:id/status', superAdminMiddleware, updateRestaurantStatus);
