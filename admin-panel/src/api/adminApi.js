@@ -1,5 +1,10 @@
 import axiosInstance from './axiosInstance.js'
 
+export async function createRestaurant(data) {
+  const response = await axiosInstance.post('/super-admin/restaurants', data)
+  return response.data
+}
+
 export async function getRestaurants() {
   const response = await axiosInstance.get('/super-admin/restaurants')
   return response.data

@@ -6,21 +6,26 @@ import {
   ArrowUpRight,
   Building2,
   Calendar,
+  Check,
   CheckCircle2,
   Coffee,
+  Copy,
   CreditCard,
   ExternalLink,
   Eye,
   IndianRupee,
   Layers,
+  Plus,
   RefreshCw,
   ShoppingBag,
   Sparkles,
   Store,
   TrendingUp,
   Users,
+  X,
 } from 'lucide-react'
 import {
+  createRestaurant,
   getPlans,
   getRestaurantDetails,
   getRestaurants,
@@ -62,6 +67,16 @@ function formatDate(value) {
 }
 
 const planOptions = ['trial', 'basic', 'pro']
+const staffPanelUrl =
+  import.meta.env.VITE_STAFF_PANEL_URL || 'http://localhost:5173/login'
+
+const initialCreateForm = {
+  restaurantName: '',
+  ownerName: '',
+  ownerEmail: '',
+  ownerPassword: '',
+  plan: 'trial',
+}
 
 function Dashboard() {
   const { admin } = useAdminAuth()
@@ -83,6 +98,14 @@ function Dashboard() {
   const [selectedTenant, setSelectedTenant] = useState(null)
   const [confirmToggleTenant, setConfirmToggleTenant] = useState(null)
   const [actionLoading, setActionLoading] = useState(false)
+
+  // Create Restaurant Modal & Confirmation State
+  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [createForm, setCreateForm] = useState(initialCreateForm)
+  const [createError, setCreateError] = useState('')
+  const [creating, setCreating] = useState(false)
+  const [createdConfirmation, setCreatedConfirmation] = useState(null)
+  const [copiedDetails, setCopiedDetails] = useState(false)
 
   const loadDashboardData = useCallback(async (isRefresh = false) => {
     if (isRefresh) {
@@ -299,6 +322,105 @@ function Dashboard() {
     }
   }
 
+  const selectablePlans = useMemo(() => {
+    const defaults = [
+      { value: 'trial', name: 'Trial', price: 0 },
+      { value: 'basic', name: 'Basic', price: 999 },
+      { value: 'pro', name: 'Pro', price: 2499 },
+    ]
+    if (!plans || plans.length === 0) return defaults
+
+    return defaults.map((def, idx) => {
+      const matched =
+        plans.find((p) => p.name?.toLowerCase().includes(def.value)) ||
+        plans[idx]
+      if (!matched) return def
+      return {
+        value: def.value,
+        name: matched.name || def.name,
+        price: matched.price ?? def.price,
+      }
+    })
+  }, [plans])
+
+  const handleOpenCreateModal = async () => {
+    setCreateError('')
+    setCreateForm(initialCreateForm)
+    setShowCreateModal(true)
+    if (plans.length === 0) {
+      try {
+        const plansRes = await getPlans()
+        setPlans(plansRes.data || [])
+      } catch {
+        // Keep default fallback tiers if plans endpoint fails
+      }
+    }
+  }
+
+  const handleCreateRestaurant = async (event) => {
+    event.preventDefault()
+    setCreateError('')
+
+    const payload = {
+      restaurantName: createForm.restaurantName.trim(),
+      ownerName: createForm.ownerName.trim(),
+      ownerEmail: createForm.ownerEmail.trim().toLowerCase(),
+      ownerPassword: createForm.ownerPassword,
+      plan: createForm.plan,
+    }
+
+    if (
+      !payload.restaurantName ||
+      !payload.ownerName ||
+      !payload.ownerEmail ||
+      !payload.ownerPassword
+    ) {
+      setCreateError('All fields are required to onboard a new restaurant.')
+      return
+    }
+
+    setCreating(true)
+    try {
+      const response = await createRestaurant(payload)
+      const createdOwnerEmail =
+        response?.data?.owner?.email || payload.ownerEmail
+      const createdRestaurantName =
+        response?.data?.restaurant?.name ||
+        response?.data?.name ||
+        payload.restaurantName
+
+      setShowCreateModal(false)
+      setCreateForm(initialCreateForm)
+      setCreatedConfirmation({
+        restaurantName: createdRestaurantName,
+        ownerName: response?.data?.owner?.name || payload.ownerName,
+        ownerEmail: createdOwnerEmail,
+        plan: payload.plan,
+        staffPanelUrl,
+      })
+      setToast({
+        message: `${createdRestaurantName} created successfully!`,
+        type: 'success',
+      })
+      await loadDashboardData(true)
+    } catch (err) {
+      setCreateError(
+        err.response?.data?.message ||
+          'Failed to create restaurant account. Please check your inputs.'
+      )
+    } finally {
+      setCreating(false)
+    }
+  }
+
+  const handleCopyCredentials = () => {
+    if (!createdConfirmation) return
+    const text = `Account created! Share these login details with the restaurant owner: Email: ${createdConfirmation.ownerEmail}, they can log in at ${createdConfirmation.staffPanelUrl}`
+    navigator.clipboard?.writeText(text)
+    setCopiedDetails(true)
+    setTimeout(() => setCopiedDetails(false), 2500)
+  }
+
   const todayLabel = new Intl.DateTimeFormat('en-US', {
     weekday: 'short',
     month: 'short',
@@ -347,12 +469,88 @@ function Dashboard() {
             <span>{refreshing ? 'Refreshing...' : 'Refresh'}</span>
           </button>
 
-          <Link to="/dashboard/plans" className="btn-primary text-xs px-4 py-2">
-            <CreditCard size={14} />
+          <Link to="/dashboard/plans" className="btn-secondary text-xs px-4 py-2">
+            <CreditCard size={14} className="text-[#6F4E37]" />
             <span>Manage Plans</span>
           </Link>
+
+          <button
+            type="button"
+            onClick={handleOpenCreateModal}
+            className="btn-primary text-xs px-4 py-2"
+          >
+            <Plus size={15} />
+            <span>+ Create Restaurant</span>
+          </button>
         </div>
       </div>
+
+      {/* Created Restaurant Owner Login Confirmation Banner */}
+      {createdConfirmation && (
+        <div className="card border-[#4F8A5A]/40 bg-[#4F8A5A]/[0.07] p-5">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex items-start gap-3.5">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#4F8A5A] text-white shadow-2xs">
+                <CheckCircle2 size={20} />
+              </div>
+              <div className="space-y-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 className="text-sm font-extrabold text-[#241B15]">
+                    {createdConfirmation.restaurantName} Onboarded Successfully
+                  </h3>
+                  <StatusBadge
+                    status={createdConfirmation.plan}
+                    label={`${createdConfirmation.plan} plan`}
+                  />
+                </div>
+                <p className="text-xs sm:text-sm font-medium text-[#241B15] leading-relaxed">
+                  Account created! Share these login details with the restaurant owner:{' '}
+                  <span className="font-extrabold text-[#6F4E37]">
+                    Email: {createdConfirmation.ownerEmail}
+                  </span>
+                  , they can log in at{' '}
+                  <a
+                    href={createdConfirmation.staffPanelUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="font-bold text-[#6F4E37] underline hover:text-[#2B2118]"
+                  >
+                    {createdConfirmation.staffPanelUrl}
+                  </a>
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+              <button
+                type="button"
+                onClick={handleCopyCredentials}
+                className="btn-secondary text-xs px-3 py-1.5"
+              >
+                {copiedDetails ? (
+                  <>
+                    <Check size={13} className="text-[#4F8A5A]" />
+                    <span>Copied</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy size={13} className="text-[#6F4E37]" />
+                    <span>Copy Details</span>
+                  </>
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => setCreatedConfirmation(null)}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-xl text-[#81766D] hover:bg-white hover:text-[#241B15]"
+                aria-label="Dismiss confirmation"
+              >
+                <X size={15} />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {error && (
         <div className="flex items-center gap-2.5 rounded-2xl border border-[#C75C5C]/30 bg-[#C75C5C]/10 p-4 text-sm font-medium text-[#C75C5C]">
@@ -412,14 +610,22 @@ function Dashboard() {
             <div>
               <h2 className="text-sm font-bold text-[#241B15]">Quick Actions</h2>
               <p className="text-xs text-[#81766D]">
-                Jump directly to subscription tiers, filter tenant licenses, or inspect café performance
+                Onboard a new café tenant, manage subscription tiers, or filter licenses
               </p>
             </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5">
-            <Link to="/dashboard/plans" className="btn-primary text-xs px-3.5 py-2">
-              <CreditCard size={14} />
+            <button
+              type="button"
+              onClick={handleOpenCreateModal}
+              className="btn-primary text-xs px-3.5 py-2"
+            >
+              <Plus size={14} />
+              <span>+ Create Restaurant</span>
+            </button>
+            <Link to="/dashboard/plans" className="btn-secondary text-xs px-3.5 py-2">
+              <CreditCard size={14} className="text-[#6F4E37]" />
               <span>+ Add / Edit Plans</span>
             </Link>
             <button
@@ -1074,6 +1280,180 @@ function Dashboard() {
           </div>
         )}
       </Drawer>
+
+      {/* Create Restaurant Modal (.card max-w-md) */}
+      {showCreateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="fixed inset-0 bg-[#2B2118]/50 backdrop-blur-[2px] transition-opacity"
+            onClick={() => !creating && setShowCreateModal(false)}
+            aria-hidden="true"
+          />
+
+          <div className="card relative z-10 w-full max-w-md p-6 shadow-2xl">
+            <div className="flex items-start justify-between gap-3 border-b border-[#F7F5F2] pb-4">
+              <div>
+                <h2 className="text-lg font-bold text-[#241B15]">
+                  Create Restaurant
+                </h2>
+                <p className="mt-0.5 text-xs text-[#81766D]">
+                  Onboard a new café with an owner account and subscription plan
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => !creating && setShowCreateModal(false)}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-xl text-[#81766D] hover:bg-[#F7F5F2] hover:text-[#241B15]"
+                aria-label="Close modal"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateRestaurant} className="mt-4 space-y-4">
+              {createError && (
+                <div className="flex items-center gap-2 rounded-xl border border-[#C75C5C]/30 bg-[#C75C5C]/10 px-3.5 py-2.5 text-xs font-semibold text-[#C75C5C]">
+                  <AlertCircle size={15} className="shrink-0" />
+                  <span>{createError}</span>
+                </div>
+              )}
+
+              <div>
+                <label className="mb-1.5 block text-xs font-bold text-[#241B15]">
+                  Restaurant Name
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={createForm.restaurantName}
+                  onChange={(e) =>
+                    setCreateForm((prev) => ({
+                      ...prev,
+                      restaurantName: e.target.value,
+                    }))
+                  }
+                  placeholder="e.g. Third Wave Coffee Roasters"
+                  className="input-field"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1.5 block text-xs font-bold text-[#241B15]">
+                  Owner Name
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={createForm.ownerName}
+                  onChange={(e) =>
+                    setCreateForm((prev) => ({
+                      ...prev,
+                      ownerName: e.target.value,
+                    }))
+                  }
+                  placeholder="e.g. Rohan Verma"
+                  className="input-field"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1.5 block text-xs font-bold text-[#241B15]">
+                  Owner Email
+                </label>
+                <input
+                  type="email"
+                  required
+                  value={createForm.ownerEmail}
+                  onChange={(e) =>
+                    setCreateForm((prev) => ({
+                      ...prev,
+                      ownerEmail: e.target.value,
+                    }))
+                  }
+                  placeholder="owner@caferoasters.com"
+                  className="input-field"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1.5 block text-xs font-bold text-[#241B15]">
+                  Owner Password
+                </label>
+                <input
+                  type="password"
+                  required
+                  minLength={8}
+                  value={createForm.ownerPassword}
+                  onChange={(e) =>
+                    setCreateForm((prev) => ({
+                      ...prev,
+                      ownerPassword: e.target.value,
+                    }))
+                  }
+                  placeholder="Min 8 chars, 1 letter & 1 number"
+                  className="input-field"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1.5 block text-xs font-bold text-[#241B15]">
+                  Subscription Plan
+                </label>
+                <div className="grid grid-cols-3 gap-2.5">
+                  {selectablePlans.map((tier) => {
+                    const isSelected = createForm.plan === tier.value
+                    return (
+                      <button
+                        key={tier.value}
+                        type="button"
+                        onClick={() =>
+                          setCreateForm((prev) => ({
+                            ...prev,
+                            plan: tier.value,
+                          }))
+                        }
+                        className={`flex flex-col items-start rounded-xl border p-3 text-left transition-all ${
+                          isSelected
+                            ? 'border-[#6F4E37] bg-[#6F4E37]/10 ring-2 ring-[#6F4E37]/20'
+                            : 'border-[#E8E1DA] bg-[#F7F5F2]/60 hover:border-[#6F4E37]/40'
+                        }`}
+                      >
+                        <span className="text-xs font-extrabold capitalize text-[#241B15]">
+                          {tier.name}
+                        </span>
+                        <span className="mt-1 text-xs font-bold text-[#6F4E37]">
+                          {formatCurrency(tier.price)}
+                          <span className="text-[10px] font-normal text-[#81766D]">
+                            /mo
+                          </span>
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2.5 border-t border-[#F7F5F2] pt-4">
+                <button
+                  type="button"
+                  disabled={creating}
+                  onClick={() => setShowCreateModal(false)}
+                  className="btn-secondary"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={creating}
+                  className="btn-primary"
+                >
+                  {creating ? 'Creating...' : 'Save Restaurant'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       <ConfirmDialog
         open={Boolean(confirmToggleTenant)}
