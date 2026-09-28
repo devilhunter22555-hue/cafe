@@ -4,6 +4,7 @@ import {
   Activity,
   AlertCircle,
   ArrowUpRight,
+  Ban,
   Building2,
   Calendar,
   Check,
@@ -15,8 +16,11 @@ import {
   Eye,
   IndianRupee,
   Layers,
+  Mail,
   Plus,
   RefreshCw,
+  Send,
+  ShieldCheck,
   ShoppingBag,
   Sparkles,
   Store,
@@ -29,10 +33,13 @@ import {
   getPlans,
   getRestaurantDetails,
   getRestaurants,
+  sendDailySalesReport,
+  sendMonthlySalesReport,
   updateRestaurantPlan,
   updateRestaurantStatus,
 } from '../api/adminApi.js'
 import { useAdminAuth } from '../context/AdminAuthContext.jsx'
+import CreateCafeModal from '../components/CreateCafeModal.jsx'
 import {
   ConfirmDialog,
   Drawer,
@@ -70,14 +77,6 @@ const planOptions = ['trial', 'basic', 'pro']
 const staffPanelUrl =
   import.meta.env.VITE_STAFF_PANEL_URL || 'http://localhost:5173/login'
 
-const initialCreateForm = {
-  restaurantName: '',
-  ownerName: '',
-  ownerEmail: '',
-  ownerPassword: '',
-  plan: 'trial',
-}
-
 function Dashboard() {
   const { admin } = useAdminAuth()
   const [restaurants, setRestaurants] = useState([])
@@ -99,13 +98,12 @@ function Dashboard() {
   const [confirmToggleTenant, setConfirmToggleTenant] = useState(null)
   const [actionLoading, setActionLoading] = useState(false)
 
-  // Create Restaurant Modal & Confirmation State
+  // Create Café Modal & Confirmation State
   const [showCreateModal, setShowCreateModal] = useState(false)
-  const [createForm, setCreateForm] = useState(initialCreateForm)
-  const [createError, setCreateError] = useState('')
   const [creating, setCreating] = useState(false)
   const [createdConfirmation, setCreatedConfirmation] = useState(null)
   const [copiedDetails, setCopiedDetails] = useState(false)
+  const [sendingReportType, setSendingReportType] = useState('')
 
   const loadDashboardData = useCallback(async (isRefresh = false) => {
     if (isRefresh) {
@@ -174,6 +172,11 @@ function Dashboard() {
       (sum, r) => sum + (Number(r.totalOrders) || 0),
       0
     )
+    const totalCustomers = restaurants.reduce(
+      (sum, r) => sum + (Number(r.totalCustomers ?? r.customerCount) || 0),
+      0
+    )
+    const totalAdmins = restaurants.filter((r) => Boolean(r.admin || r.owner)).length || totalCafes
 
     const trialCount = restaurants.filter((r) => (r.plan || 'trial') === 'trial').length
     const basicCount = restaurants.filter((r) => r.plan === 'basic').length
@@ -187,6 +190,8 @@ function Dashboard() {
       totalStaff,
       totalRevenue,
       totalOrders,
+      totalCustomers,
+      totalAdmins,
       trialCount,
       basicCount,
       proCount,
@@ -322,30 +327,7 @@ function Dashboard() {
     }
   }
 
-  const selectablePlans = useMemo(() => {
-    const defaults = [
-      { value: 'trial', name: 'Trial', price: 0 },
-      { value: 'basic', name: 'Basic', price: 999 },
-      { value: 'pro', name: 'Pro', price: 2499 },
-    ]
-    if (!plans || plans.length === 0) return defaults
-
-    return defaults.map((def, idx) => {
-      const matched =
-        plans.find((p) => p.name?.toLowerCase().includes(def.value)) ||
-        plans[idx]
-      if (!matched) return def
-      return {
-        value: def.value,
-        name: matched.name || def.name,
-        price: matched.price ?? def.price,
-      }
-    })
-  }, [plans])
-
   const handleOpenCreateModal = async () => {
-    setCreateError('')
-    setCreateForm(initialCreateForm)
     setShowCreateModal(true)
     if (plans.length === 0) {
       try {
@@ -357,45 +339,32 @@ function Dashboard() {
     }
   }
 
-  const handleCreateRestaurant = async (event) => {
-    event.preventDefault()
-    setCreateError('')
-
-    const payload = {
-      restaurantName: createForm.restaurantName.trim(),
-      ownerName: createForm.ownerName.trim(),
-      ownerEmail: createForm.ownerEmail.trim().toLowerCase(),
-      ownerPassword: createForm.ownerPassword,
-      plan: createForm.plan,
-    }
-
-    if (
-      !payload.restaurantName ||
-      !payload.ownerName ||
-      !payload.ownerEmail ||
-      !payload.ownerPassword
-    ) {
-      setCreateError('All fields are required to onboard a new restaurant.')
-      return
-    }
-
+  const handleCreateRestaurant = async (payload) => {
     setCreating(true)
     try {
       const response = await createRestaurant(payload)
       const createdOwnerEmail =
-        response?.data?.owner?.email || payload.ownerEmail
+        response?.data?.admin?.email ||
+        response?.data?.owner?.email ||
+        payload.adminEmail ||
+        payload.ownerEmail
       const createdRestaurantName =
+        response?.data?.cafe?.name ||
         response?.data?.restaurant?.name ||
         response?.data?.name ||
+        payload.name ||
         payload.restaurantName
 
       setShowCreateModal(false)
-      setCreateForm(initialCreateForm)
       setCreatedConfirmation({
         restaurantName: createdRestaurantName,
-        ownerName: response?.data?.owner?.name || payload.ownerName,
+        ownerName:
+          response?.data?.admin?.name ||
+          response?.data?.owner?.name ||
+          payload.adminName ||
+          payload.ownerName,
         ownerEmail: createdOwnerEmail,
-        plan: payload.plan,
+        plan: payload.subscriptionPlan || payload.plan || 'trial',
         staffPanelUrl,
       })
       setToast({
@@ -403,11 +372,6 @@ function Dashboard() {
         type: 'success',
       })
       await loadDashboardData(true)
-    } catch (err) {
-      setCreateError(
-        err.response?.data?.message ||
-          'Failed to create restaurant account. Please check your inputs.'
-      )
     } finally {
       setCreating(false)
     }
@@ -419,6 +383,31 @@ function Dashboard() {
     navigator.clipboard?.writeText(text)
     setCopiedDetails(true)
     setTimeout(() => setCopiedDetails(false), 2500)
+  }
+
+  const handleSendSalesReport = async (type) => {
+    setSendingReportType(type)
+    try {
+      const response =
+        type === 'daily'
+          ? await sendDailySalesReport()
+          : await sendMonthlySalesReport()
+      setToast({
+        message:
+          response.data?.message ||
+          `${type === 'daily' ? 'Daily' : 'Monthly'} sales report generated and emailed successfully.`,
+        type: 'success',
+      })
+    } catch (err) {
+      setToast({
+        message:
+          err.response?.data?.message ||
+          `Failed to send ${type} sales report. Check SMTP configuration in Backend/.env.`,
+        type: 'error',
+      })
+    } finally {
+      setSendingReportType('')
+    }
   }
 
   const todayLabel = new Intl.DateTimeFormat('en-US', {
@@ -480,7 +469,7 @@ function Dashboard() {
             className="btn-primary text-xs px-4 py-2"
           >
             <Plus size={15} />
-            <span>+ Create Restaurant</span>
+            <span>+ Create Café</span>
           </button>
         </div>
       </div>
@@ -559,45 +548,70 @@ function Dashboard() {
         </div>
       )}
 
-      {/* 4 Premium Statistic Cards (Real Backend Data) */}
-      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard
-          title="Platform Revenue"
-          value={formatCurrency(stats.totalRevenue)}
-          subtitle="Total billed revenue across cafés"
-          icon={IndianRupee}
-          tone="coffee"
-          loading={loading}
-        />
-        <StatCard
-          title="Total Orders"
-          value={stats.totalOrders.toLocaleString('en-IN')}
-          subtitle="Orders processed across branches"
-          icon={ShoppingBag}
-          tone="accent"
-          loading={loading}
-        />
-        <StatCard
-          title="Café Accounts"
-          value={`${stats.activeCafes} / ${stats.totalCafes}`}
-          badge={stats.activeCafes > 0 ? `${stats.activeCafes} Live` : undefined}
-          subtitle={
-            stats.suspendedCafes > 0
-              ? `${stats.suspendedCafes} suspended · ${stats.totalBranches} branches`
-              : `${stats.totalBranches} active branches`
-          }
-          icon={Store}
-          tone="success"
-          loading={loading}
-        />
-        <StatCard
-          title="Staff & Team Users"
-          value={stats.totalStaff.toLocaleString('en-IN')}
-          subtitle={`Across ${plans.length} subscription tiers`}
-          icon={Users}
-          tone="dark"
-          loading={loading}
-        />
+      {/* Top Statistics — Real Database Counts */}
+      <section className="space-y-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <StatCard
+            title="Total Cafés"
+            value={stats.totalCafes.toLocaleString('en-IN')}
+            subtitle={`${stats.totalBranches} registered branch locations`}
+            icon={Store}
+            tone="coffee"
+            loading={loading}
+          />
+          <StatCard
+            title="Active Cafés"
+            value={stats.activeCafes.toLocaleString('en-IN')}
+            badge={stats.activeCafes > 0 ? 'ACTIVE' : undefined}
+            subtitle="Operational cafés accepting orders"
+            icon={CheckCircle2}
+            tone="success"
+            loading={loading}
+          />
+          <StatCard
+            title="Inactive Cafés"
+            value={stats.suspendedCafes.toLocaleString('en-IN')}
+            subtitle="Paused or deactivated café accounts"
+            icon={Ban}
+            tone="accent"
+            loading={loading}
+          />
+          <StatCard
+            title="Total Café Admins"
+            value={stats.totalAdmins.toLocaleString('en-IN')}
+            subtitle={`${stats.totalStaff.toLocaleString('en-IN')} total staff & team accounts`}
+            icon={ShieldCheck}
+            tone="dark"
+            loading={loading}
+          />
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <StatCard
+            title="Total Orders"
+            value={stats.totalOrders.toLocaleString('en-IN')}
+            subtitle="Orders processed across all cafés"
+            icon={ShoppingBag}
+            tone="accent"
+            loading={loading}
+          />
+          <StatCard
+            title="Total Revenue"
+            value={formatCurrency(stats.totalRevenue)}
+            subtitle="Total billed revenue across cafés"
+            icon={IndianRupee}
+            tone="coffee"
+            loading={loading}
+          />
+          <StatCard
+            title="Total Customers"
+            value={stats.totalCustomers.toLocaleString('en-IN')}
+            subtitle="Registered customers across all cafés"
+            icon={Users}
+            tone="success"
+            loading={loading}
+          />
+        </div>
       </section>
 
       {/* Quick Actions Bar */}
@@ -622,7 +636,7 @@ function Dashboard() {
               className="btn-primary text-xs px-3.5 py-2"
             >
               <Plus size={14} />
-              <span>+ Create Restaurant</span>
+              <span>+ Create Café</span>
             </button>
             <Link to="/dashboard/plans" className="btn-secondary text-xs px-3.5 py-2">
               <CreditCard size={14} className="text-[#6F4E37]" />
@@ -653,6 +667,32 @@ function Dashboard() {
             >
               <Building2 size={14} className="text-[#C98A5B]" />
               <span>Suspended ({stats.suspendedCafes})</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleSendSalesReport('daily')}
+              disabled={Boolean(sendingReportType)}
+              className="btn-secondary text-xs px-3.5 py-2"
+            >
+              <Mail size={14} className="text-[#6F4E37]" />
+              <span>
+                {sendingReportType === 'daily'
+                  ? 'Sending Daily Report...'
+                  : 'Send Daily Report'}
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleSendSalesReport('monthly')}
+              disabled={Boolean(sendingReportType)}
+              className="btn-secondary text-xs px-3.5 py-2"
+            >
+              <Send size={14} className="text-[#6F4E37]" />
+              <span>
+                {sendingReportType === 'monthly'
+                  ? 'Sending Monthly Report...'
+                  : 'Send Monthly Report'}
+              </span>
             </button>
             <button
               type="button"
@@ -1281,179 +1321,15 @@ function Dashboard() {
         )}
       </Drawer>
 
-      {/* Create Restaurant Modal (.card max-w-md) */}
-      {showCreateModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div
-            className="fixed inset-0 bg-[#2B2118]/50 backdrop-blur-[2px] transition-opacity"
-            onClick={() => !creating && setShowCreateModal(false)}
-            aria-hidden="true"
-          />
-
-          <div className="card relative z-10 w-full max-w-md p-6 shadow-2xl">
-            <div className="flex items-start justify-between gap-3 border-b border-[#F7F5F2] pb-4">
-              <div>
-                <h2 className="text-lg font-bold text-[#241B15]">
-                  Create Restaurant
-                </h2>
-                <p className="mt-0.5 text-xs text-[#81766D]">
-                  Onboard a new café with an owner account and subscription plan
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => !creating && setShowCreateModal(false)}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-xl text-[#81766D] hover:bg-[#F7F5F2] hover:text-[#241B15]"
-                aria-label="Close modal"
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            <form onSubmit={handleCreateRestaurant} className="mt-4 space-y-4">
-              {createError && (
-                <div className="flex items-center gap-2 rounded-xl border border-[#C75C5C]/30 bg-[#C75C5C]/10 px-3.5 py-2.5 text-xs font-semibold text-[#C75C5C]">
-                  <AlertCircle size={15} className="shrink-0" />
-                  <span>{createError}</span>
-                </div>
-              )}
-
-              <div>
-                <label className="mb-1.5 block text-xs font-bold text-[#241B15]">
-                  Restaurant Name
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={createForm.restaurantName}
-                  onChange={(e) =>
-                    setCreateForm((prev) => ({
-                      ...prev,
-                      restaurantName: e.target.value,
-                    }))
-                  }
-                  placeholder="e.g. Third Wave Coffee Roasters"
-                  className="input-field"
-                />
-              </div>
-
-              <div>
-                <label className="mb-1.5 block text-xs font-bold text-[#241B15]">
-                  Owner Name
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={createForm.ownerName}
-                  onChange={(e) =>
-                    setCreateForm((prev) => ({
-                      ...prev,
-                      ownerName: e.target.value,
-                    }))
-                  }
-                  placeholder="e.g. Rohan Verma"
-                  className="input-field"
-                />
-              </div>
-
-              <div>
-                <label className="mb-1.5 block text-xs font-bold text-[#241B15]">
-                  Owner Email
-                </label>
-                <input
-                  type="email"
-                  required
-                  value={createForm.ownerEmail}
-                  onChange={(e) =>
-                    setCreateForm((prev) => ({
-                      ...prev,
-                      ownerEmail: e.target.value,
-                    }))
-                  }
-                  placeholder="owner@caferoasters.com"
-                  className="input-field"
-                />
-              </div>
-
-              <div>
-                <label className="mb-1.5 block text-xs font-bold text-[#241B15]">
-                  Owner Password
-                </label>
-                <input
-                  type="password"
-                  required
-                  minLength={8}
-                  value={createForm.ownerPassword}
-                  onChange={(e) =>
-                    setCreateForm((prev) => ({
-                      ...prev,
-                      ownerPassword: e.target.value,
-                    }))
-                  }
-                  placeholder="Min 8 chars, 1 letter & 1 number"
-                  className="input-field"
-                />
-              </div>
-
-              <div>
-                <label className="mb-1.5 block text-xs font-bold text-[#241B15]">
-                  Subscription Plan
-                </label>
-                <div className="grid grid-cols-3 gap-2.5">
-                  {selectablePlans.map((tier) => {
-                    const isSelected = createForm.plan === tier.value
-                    return (
-                      <button
-                        key={tier.value}
-                        type="button"
-                        onClick={() =>
-                          setCreateForm((prev) => ({
-                            ...prev,
-                            plan: tier.value,
-                          }))
-                        }
-                        className={`flex flex-col items-start rounded-xl border p-3 text-left transition-all ${
-                          isSelected
-                            ? 'border-[#6F4E37] bg-[#6F4E37]/10 ring-2 ring-[#6F4E37]/20'
-                            : 'border-[#E8E1DA] bg-[#F7F5F2]/60 hover:border-[#6F4E37]/40'
-                        }`}
-                      >
-                        <span className="text-xs font-extrabold capitalize text-[#241B15]">
-                          {tier.name}
-                        </span>
-                        <span className="mt-1 text-xs font-bold text-[#6F4E37]">
-                          {formatCurrency(tier.price)}
-                          <span className="text-[10px] font-normal text-[#81766D]">
-                            /mo
-                          </span>
-                        </span>
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
-
-              <div className="flex items-center justify-end gap-2.5 border-t border-[#F7F5F2] pt-4">
-                <button
-                  type="button"
-                  disabled={creating}
-                  onClick={() => setShowCreateModal(false)}
-                  className="btn-secondary"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={creating}
-                  className="btn-primary"
-                >
-                  {creating ? 'Creating...' : 'Save Restaurant'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      {/* Multi-Section Create Café + Admin Modal */}
+      <CreateCafeModal
+        open={showCreateModal}
+        onClose={() => !creating && setShowCreateModal(false)}
+        onSubmit={handleCreateRestaurant}
+        plans={plans}
+        loading={creating}
+        mode="create"
+      />
 
       <ConfirmDialog
         open={Boolean(confirmToggleTenant)}

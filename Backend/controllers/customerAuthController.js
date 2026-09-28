@@ -2,6 +2,7 @@ const jwt = require('jsonwebtoken');
 const Customer = require('../models/Customer');
 const OtpSession = require('../models/OtpSession');
 const Table = require('../models/Table');
+const Restaurant = require('../models/Restaurant');
 
 function createError(message, statusCode) {
   const error = new Error(message);
@@ -17,6 +18,16 @@ async function findTableByQrToken(qrToken) {
   return Table.collection.findOne({ qrToken, isActive: true });
 }
 
+async function assertCafeActive(restaurantId) {
+  const restaurant = await Restaurant.findById(restaurantId).select('isActive status').lean();
+  if (!restaurant || restaurant.isActive === false || restaurant.status === 'INACTIVE') {
+    throw createError(
+      'This café account is currently inactive. Please contact the system administrator.',
+      403
+    );
+  }
+}
+
 async function requestOtp(req, res, next) {
   try {
     const { qrToken, phone } = req.body;
@@ -24,6 +35,8 @@ async function requestOtp(req, res, next) {
 
     const table = await findTableByQrToken(qrToken);
     if (!table) throw createError('Invalid QR code', 404);
+
+    await assertCafeActive(table.restaurantId);
 
     const otp = getOtp();
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
@@ -56,6 +69,8 @@ async function verifyOtp(req, res, next) {
     const table = await findTableByQrToken(qrToken);
     if (!table) throw createError('Invalid QR code', 404);
 
+    await assertCafeActive(table.restaurantId);
+
     const otpSession = await OtpSession.findOne({
       phone,
       otp: String(otp),
@@ -77,9 +92,11 @@ async function verifyOtp(req, res, next) {
     const token = jwt.sign({
       customerId: customer._id,
       restaurantId: table.restaurantId,
+      cafeId: table.restaurantId,
       branchId: table.branchId,
       tableId: table._id,
-      phone
+      phone,
+      role: 'CUSTOMER'
     }, process.env.JWT_ACCESS_SECRET, { expiresIn: '4h' });
 
     res.json({

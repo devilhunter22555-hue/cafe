@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
+  BarChart3,
   Bell,
   Building2,
   CheckCircle2,
@@ -16,6 +17,7 @@ import {
   ShieldCheck,
   Store,
   User,
+  Users,
   X,
 } from 'lucide-react'
 import { useAdminAuth } from '../context/AdminAuthContext.jsx'
@@ -54,7 +56,7 @@ function AdminLayout() {
 
   const navSections = [
     {
-      section: 'Overview',
+      section: 'Super Admin',
       items: [
         {
           name: 'Dashboard',
@@ -62,10 +64,29 @@ function AdminLayout() {
           icon: LayoutDashboard,
           exact: true,
         },
+        {
+          name: 'Café Management',
+          path: '/dashboard/cafes',
+          icon: Store,
+          exact: false,
+          matchAlso: ['/dashboard/restaurants/'],
+        },
+        {
+          name: 'Admins',
+          path: '/dashboard/admins',
+          icon: Users,
+          exact: false,
+        },
+        {
+          name: 'Reports',
+          path: '/dashboard/reports',
+          icon: BarChart3,
+          exact: false,
+        },
       ],
     },
     {
-      section: 'Finance & Tiers',
+      section: 'Finance & System',
       items: [
         {
           name: 'Subscription Plans',
@@ -73,11 +94,6 @@ function AdminLayout() {
           icon: CreditCard,
           exact: false,
         },
-      ],
-    },
-    {
-      section: 'System',
-      items: [
         {
           name: 'Settings',
           path: '/dashboard/settings',
@@ -89,16 +105,28 @@ function AdminLayout() {
   ]
 
   const getPageBreadcrumb = () => {
+    if (location.pathname === '/dashboard/cafes') {
+      return { section: 'Super Admin', title: 'Café Management' }
+    }
+    if (
+      location.pathname.startsWith('/dashboard/cafes/') ||
+      location.pathname.startsWith('/dashboard/restaurants/')
+    ) {
+      return { section: 'Café Management', title: 'Café Account Details' }
+    }
+    if (location.pathname === '/dashboard/admins') {
+      return { section: 'Super Admin', title: 'Café Administrators' }
+    }
+    if (location.pathname === '/dashboard/reports') {
+      return { section: 'Super Admin', title: 'Performance Reports & Audit Logs' }
+    }
     if (location.pathname === '/dashboard/plans') {
-      return { section: 'Finance & Tiers', title: 'Subscription Plans' }
+      return { section: 'Finance & System', title: 'Subscription Plans' }
     }
     if (location.pathname === '/dashboard/settings') {
-      return { section: 'System', title: 'Settings & Preferences' }
+      return { section: 'Finance & System', title: 'Settings & Preferences' }
     }
-    if (location.pathname.startsWith('/dashboard/restaurants/')) {
-      return { section: 'Café Management', title: 'Tenant Account Details' }
-    }
-    return { section: 'Overview', title: 'Dashboard' }
+    return { section: 'Super Admin', title: 'Dashboard' }
   }
 
   const breadcrumb = getPageBreadcrumb()
@@ -110,8 +138,10 @@ function AdminLayout() {
       .filter(
         (t) =>
           t.name?.toLowerCase().includes(q) ||
+          t.ownerName?.toLowerCase().includes(q) ||
           t.owner?.name?.toLowerCase().includes(q) ||
-          t.owner?.email?.toLowerCase().includes(q)
+          t.owner?.email?.toLowerCase().includes(q) ||
+          t.city?.toLowerCase().includes(q)
       )
       .slice(0, 5)
   }, [globalSearch, tenants])
@@ -146,7 +176,7 @@ function AdminLayout() {
           <Link
             to="/dashboard"
             className="flex items-center gap-3 min-w-0"
-            title="Café Management Admin"
+            title="Super Admin Console"
           >
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#6F4E37] text-white shadow-xs">
               <Coffee size={20} />
@@ -154,11 +184,11 @@ function AdminLayout() {
             {!isCollapsed && (
               <div className="min-w-0">
                 <h2 className="truncate text-sm font-extrabold tracking-tight text-[#241B15]">
-                  Café Management
+                  Café Platform
                 </h2>
                 <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-[#6F4E37]">
                   <ShieldCheck size={11} />
-                  <span>Admin Console</span>
+                  <span>Super Admin</span>
                 </span>
               </div>
             )}
@@ -198,10 +228,12 @@ function AdminLayout() {
               <nav className="space-y-1">
                 {group.items.map((item) => {
                   const Icon = item.icon
+                  const extraMatch = (item.matchAlso || []).some((prefix) =>
+                    location.pathname.startsWith(prefix)
+                  )
                   const isActive = item.exact
-                    ? location.pathname === item.path ||
-                      location.pathname.startsWith('/dashboard/restaurants/')
-                    : location.pathname.startsWith(item.path)
+                    ? location.pathname === item.path
+                    : location.pathname.startsWith(item.path) || extraMatch
 
                   return (
                     <div key={item.path} className="relative group">
@@ -248,17 +280,24 @@ function AdminLayout() {
             <div>
               <div className="flex items-center justify-between px-3 mb-2">
                 <span className="text-[10px] font-bold uppercase tracking-widest text-[#81766D]">
-                  Café Tenants ({tenants.length})
+                  Cafés ({tenants.length})
                 </span>
+                <Link
+                  to="/dashboard/cafes"
+                  className="text-[10px] font-bold text-[#6F4E37] hover:underline"
+                >
+                  View All
+                </Link>
               </div>
-              <div className="space-y-1 max-h-48 overflow-y-auto pr-1">
+              <div className="space-y-1 max-h-44 overflow-y-auto pr-1">
                 {tenants.slice(0, 6).map((t) => {
                   const isCurrentTenant =
+                    location.pathname === `/dashboard/cafes/${t._id}` ||
                     location.pathname === `/dashboard/restaurants/${t._id}`
                   return (
                     <Link
                       key={t._id}
-                      to={`/dashboard/restaurants/${t._id}`}
+                      to={`/dashboard/cafes/${t._id}`}
                       onClick={() => setMobileMenuOpen(false)}
                       className={`flex items-center justify-between gap-2 rounded-xl px-3 py-2 text-xs font-medium transition-all ${
                         isCurrentTenant
@@ -274,7 +313,7 @@ function AdminLayout() {
                         className={`h-2 w-2 shrink-0 rounded-full ${
                           t.isActive ? 'bg-[#4F8A5A]' : 'bg-[#C75C5C]'
                         }`}
-                        title={t.isActive ? 'Active' : 'Suspended'}
+                        title={t.isActive ? 'ACTIVE' : 'INACTIVE'}
                       />
                     </Link>
                   )
@@ -295,7 +334,7 @@ function AdminLayout() {
               className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#6F4E37]/12 text-xs font-extrabold text-[#6F4E37]"
               title={admin?.name || 'Super Admin'}
             >
-              {admin?.name?.slice(0, 2).toUpperCase() || 'AD'}
+              {admin?.name?.slice(0, 2).toUpperCase() || 'SA'}
             </div>
             {!isCollapsed && (
               <div className="min-w-0 flex-1">
@@ -312,7 +351,7 @@ function AdminLayout() {
           <button
             type="button"
             onClick={handleLogout}
-            title="Sign Out"
+            title="Logout"
             className={`flex w-full items-center justify-center gap-2 rounded-xl border border-[#E8E1DA] bg-[#F7F5F2]/70 py-2 text-xs font-semibold text-[#81766D] transition-all hover:border-[#C75C5C]/30 hover:bg-[#C75C5C]/10 hover:text-[#C75C5C] ${
               isCollapsed ? 'mt-2 px-0' : ''
             }`}
@@ -368,7 +407,7 @@ function AdminLayout() {
                   setGlobalSearch(e.target.value)
                   setSearchOpen(true)
                 }}
-                placeholder="Quick jump to café or plan..."
+                placeholder="Quick search café, owner, city..."
                 className="w-full rounded-xl border border-[#E8E1DA] bg-[#F7F5F2] py-1.5 pl-9 pr-3 text-xs text-[#241B15] placeholder:text-[#81766D]/70 transition-all focus:bg-white focus:border-[#6F4E37] focus:outline-none focus:ring-2 focus:ring-[#6F4E37]/15"
               />
 
@@ -385,7 +424,7 @@ function AdminLayout() {
                           key={item._id}
                           type="button"
                           onMouseDown={() => {
-                            navigate(`/dashboard/restaurants/${item._id}`)
+                            navigate(`/dashboard/cafes/${item._id}`)
                             setGlobalSearch('')
                             setSearchOpen(false)
                           }}
@@ -396,11 +435,12 @@ function AdminLayout() {
                               {item.name}
                             </p>
                             <p className="text-[11px] text-[#81766D] truncate">
-                              {item.owner?.email || 'No owner email'}
+                              {item.email || item.owner?.email || 'No email'}
                             </p>
                           </div>
                           <StatusBadge
-                            status={item.isActive ? 'active' : 'suspended'}
+                            status={item.isActive ? 'active' : 'inactive'}
+                            label={item.isActive ? 'ACTIVE' : 'INACTIVE'}
                           />
                         </button>
                       ))}
@@ -414,14 +454,14 @@ function AdminLayout() {
                     <button
                       type="button"
                       onMouseDown={() => {
-                        navigate('/dashboard/plans')
+                        navigate('/dashboard/cafes')
                         setGlobalSearch('')
                         setSearchOpen(false)
                       }}
                       className="flex w-full items-center gap-2 rounded-xl px-2.5 py-2 text-xs font-semibold text-[#6F4E37] hover:bg-[#F7F5F2]"
                     >
-                      <CreditCard size={13} />
-                      <span>Go to Subscription Plans</span>
+                      <Store size={13} />
+                      <span>Go to Café Management</span>
                     </button>
                   </div>
                 </div>
@@ -469,7 +509,7 @@ function AdminLayout() {
                         />
                         <div>
                           <p className="font-semibold text-[#241B15]">
-                            {tenants.filter((t) => t.isActive).length} Active Café Licenses
+                            {tenants.filter((t) => t.isActive).length} Active Café Accounts
                           </p>
                           <p className="text-[11px] text-[#81766D]">
                             All active tenant workspaces are operational.
@@ -482,7 +522,7 @@ function AdminLayout() {
                           key={st._id}
                           type="button"
                           onClick={() => {
-                            navigate(`/dashboard/restaurants/${st._id}`)
+                            navigate(`/dashboard/cafes/${st._id}`)
                             setNotifOpen(false)
                           }}
                           className="flex w-full items-start gap-2.5 rounded-xl p-2.5 text-left text-xs hover:bg-[#F7F5F2]"
@@ -493,10 +533,10 @@ function AdminLayout() {
                           />
                           <div className="min-w-0">
                             <p className="font-semibold text-[#241B15] truncate">
-                              {st.name} is suspended
+                              {st.name} is inactive
                             </p>
                             <p className="text-[11px] text-[#81766D]">
-                              Click to review tenant license status
+                              Click to review café status
                             </p>
                           </div>
                         </button>
@@ -518,10 +558,10 @@ function AdminLayout() {
                 className="flex items-center gap-2.5 rounded-xl border border-[#E8E1DA] bg-[#F7F5F2]/70 px-3 py-1.5 text-xs font-semibold text-[#241B15] transition-all hover:bg-white hover:border-[#6F4E37]/40"
               >
                 <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-[#6F4E37] text-[10px] font-bold text-white">
-                  {admin?.name?.slice(0, 2).toUpperCase() || 'AD'}
+                  {admin?.name?.slice(0, 2).toUpperCase() || 'SA'}
                 </div>
                 <span className="hidden sm:inline max-w-[120px] truncate">
-                  {admin?.name || 'Admin'}
+                  {admin?.name || 'Super Admin'}
                 </span>
               </button>
 
@@ -543,12 +583,12 @@ function AdminLayout() {
 
                     <div className="py-1">
                       <Link
-                        to="/dashboard/settings"
+                        to="/dashboard/cafes"
                         onClick={() => setUserDropdownOpen(false)}
                         className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-[#241B15] hover:bg-[#F7F5F2]"
                       >
-                        <User size={14} className="text-[#6F4E37]" />
-                        <span>Profile</span>
+                        <Store size={14} className="text-[#6F4E37]" />
+                        <span>Café Management</span>
                       </Link>
                       <Link
                         to="/dashboard/settings"

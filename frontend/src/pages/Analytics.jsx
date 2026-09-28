@@ -1,14 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   AlertCircle,
-  BarChart3,
-  Calendar,
-  CreditCard,
-  DollarSign,
-  PieChart as PieChartIcon,
-  Receipt,
-  TrendingUp,
-  UtensilsCrossed
+  CheckCircle2,
+  Mail,
+  Send
 } from 'lucide-react'
 import {
   Bar,
@@ -25,7 +20,14 @@ import {
   XAxis,
   YAxis
 } from 'recharts'
-import { getCategoryBreakdown, getSalesByDay, getSalesSummary, getTopSellingItems } from '../api/reportApi.js'
+import {
+  getCategoryBreakdown,
+  getSalesByDay,
+  getSalesSummary,
+  getTopSellingItems,
+  sendDailyReportEmail,
+  sendMonthlyReportEmail
+} from '../api/reportApi.js'
 import { useAuth } from '../context/AuthContext.jsx'
 
 const currency = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 })
@@ -58,6 +60,8 @@ function Analytics() {
   const [categories, setCategories] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [sendingType, setSendingType] = useState('')
+  const [reportNotice, setReportNotice] = useState(null)
 
   useEffect(() => {
     let active = true
@@ -101,6 +105,31 @@ function Analytics() {
     setActiveRange(String(days))
   }
 
+  const handleTriggerReport = async (type) => {
+    setSendingType(type)
+    setReportNotice(null)
+    try {
+      const res =
+        type === 'daily'
+          ? await sendDailyReportEmail()
+          : await sendMonthlyReportEmail()
+      setReportNotice({
+        type: 'success',
+        message: res.data?.message || `Sales report (${type}) processed.`,
+        subject: res.data?.data?.subject
+      })
+    } catch (err) {
+      setReportNotice({
+        type: 'error',
+        message:
+          err.response?.data?.message ||
+          `Failed to send ${type} sales report.`
+      })
+    } finally {
+      setSendingType('')
+    }
+  }
+
   const hasData = Boolean(summary?.totalBills || salesByDay.length || topItems.length || categories.length)
 
   return (
@@ -114,43 +143,94 @@ function Analytics() {
           </p>
         </div>
 
-        {/* Date Filter Pills */}
-        <div className="flex items-center gap-1.5 rounded-xl border border-[#EBE7DF] bg-white p-1 shadow-2xs">
+        {/* Date Filter Pills + Manual Email Report Controls */}
+        <div className="flex flex-wrap items-center gap-2.5">
           <button
             type="button"
-            onClick={() => applyQuickRange(1)}
-            className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
-              activeRange === '1'
-                ? 'bg-[#6F4E37] text-white shadow-xs'
-                : 'text-[#7A7068] hover:text-[#2B2118]'
-            }`}
+            disabled={Boolean(sendingType)}
+            onClick={() => handleTriggerReport('daily')}
+            className="inline-flex items-center gap-1.5 rounded-xl border border-[#6F4E37]/30 bg-white px-3.5 py-2 text-xs font-bold text-[#6F4E37] shadow-2xs transition-all hover:bg-[#6F4E37] hover:text-white disabled:opacity-60"
           >
-            Today
+            <Mail size={14} />
+            <span>{sendingType === 'daily' ? 'Sending Daily...' : 'Send Daily Report'}</span>
           </button>
+
           <button
             type="button"
-            onClick={() => applyQuickRange(7)}
-            className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
-              activeRange === '7'
-                ? 'bg-[#6F4E37] text-white shadow-xs'
-                : 'text-[#7A7068] hover:text-[#2B2118]'
-            }`}
+            disabled={Boolean(sendingType)}
+            onClick={() => handleTriggerReport('monthly')}
+            className="inline-flex items-center gap-1.5 rounded-xl bg-[#6F4E37] px-3.5 py-2 text-xs font-bold text-white shadow-2xs transition-all hover:bg-[#2B2118] disabled:opacity-60"
           >
-            7 Days
+            <Send size={13} />
+            <span>{sendingType === 'monthly' ? 'Sending Monthly...' : 'Send Monthly Report'}</span>
           </button>
-          <button
-            type="button"
-            onClick={() => applyQuickRange(30)}
-            className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
-              activeRange === '30'
-                ? 'bg-[#6F4E37] text-white shadow-xs'
-                : 'text-[#7A7068] hover:text-[#2B2118]'
-            }`}
-          >
-            30 Days
-          </button>
+
+          <div className="flex items-center gap-1.5 rounded-xl border border-[#EBE7DF] bg-white p-1 shadow-2xs">
+            <button
+              type="button"
+              onClick={() => applyQuickRange(1)}
+              className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
+                activeRange === '1'
+                  ? 'bg-[#6F4E37] text-white shadow-xs'
+                  : 'text-[#7A7068] hover:text-[#2B2118]'
+              }`}
+            >
+              Today
+            </button>
+            <button
+              type="button"
+              onClick={() => applyQuickRange(7)}
+              className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
+                activeRange === '7'
+                  ? 'bg-[#6F4E37] text-white shadow-xs'
+                  : 'text-[#7A7068] hover:text-[#2B2118]'
+              }`}
+            >
+              7 Days
+            </button>
+            <button
+              type="button"
+              onClick={() => applyQuickRange(30)}
+              className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
+                activeRange === '30'
+                  ? 'bg-[#6F4E37] text-white shadow-xs'
+                  : 'text-[#7A7068] hover:text-[#2B2118]'
+              }`}
+            >
+              30 Days
+            </button>
+          </div>
         </div>
       </div>
+
+      {reportNotice && (
+        <div
+          className={`flex items-center justify-between gap-3 rounded-2xl border p-4 text-xs font-semibold ${
+            reportNotice.type === 'error'
+              ? 'border-rose-200 bg-rose-50 text-[#C75C5C]'
+              : 'border-emerald-200 bg-emerald-50 text-[#2B2118]'
+          }`}
+        >
+          <div className="flex items-center gap-2.5">
+            {reportNotice.type === 'error' ? (
+              <AlertCircle size={16} className="text-[#C75C5C] shrink-0" />
+            ) : (
+              <CheckCircle2 size={16} className="text-[#4F8A5A] shrink-0" />
+            )}
+            <span>
+              {reportNotice.subject ? `${reportNotice.subject} — ` : ''}
+              {reportNotice.message}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setReportNotice(null)}
+            className="text-xs font-bold text-[#7A7068] hover:text-[#2B2118]"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
 
       {/* Date Pickers */}
       <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-[#EBE7DF] bg-white p-3.5 shadow-xs">

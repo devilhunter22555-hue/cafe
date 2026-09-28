@@ -12,13 +12,33 @@ function superAdminMiddleware(req, res, next) {
     }
 
     const token = authorization.split(' ')[1];
-    const decoded = jwt.verify(token, process.env.SUPER_ADMIN_JWT_SECRET);
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.SUPER_ADMIN_JWT_SECRET);
+    } catch (verifyErr) {
+      // Check if it was a valid regular user token trying to access super-admin routes
+      if (process.env.JWT_ACCESS_SECRET) {
+        try {
+          const regularDecoded = jwt.verify(token, process.env.JWT_ACCESS_SECRET);
+          if (regularDecoded && regularDecoded.role !== 'SUPER_ADMIN') {
+            return res.status(403).json({
+              success: false,
+              data: null,
+              message: 'Forbidden: SUPER_ADMIN role required'
+            });
+          }
+        } catch {
+          // ignore
+        }
+      }
+      throw verifyErr;
+    }
 
-    if (!decoded || decoded.isSuperAdmin !== true) {
-      return res.status(401).json({
+    if (!decoded || (decoded.isSuperAdmin !== true && decoded.role !== 'SUPER_ADMIN')) {
+      return res.status(403).json({
         success: false,
         data: null,
-        message: 'Invalid super admin token'
+        message: 'Forbidden: SUPER_ADMIN role required'
       });
     }
 

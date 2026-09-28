@@ -30,6 +30,9 @@ async function login(req, res, next) {
 
     const token = jwt.sign({
       superAdminId: superAdmin._id,
+      email: superAdmin.email,
+      name: superAdmin.name,
+      role: 'SUPER_ADMIN',
       isSuperAdmin: true
     }, process.env.SUPER_ADMIN_JWT_SECRET, { expiresIn: '8h' });
 
@@ -40,7 +43,8 @@ async function login(req, res, next) {
         superAdmin: {
           id: superAdmin._id,
           name: superAdmin.name,
-          email: superAdmin.email
+          email: superAdmin.email,
+          role: 'SUPER_ADMIN'
         }
       },
       message: 'Super admin login successful'

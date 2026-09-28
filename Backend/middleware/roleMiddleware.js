@@ -1,6 +1,15 @@
+function normalizeRole(role) {
+  if (!role) return '';
+  const r = String(role).trim().toLowerCase();
+  if (r === 'admin') return 'owner';
+  return r;
+}
+
 function checkPermission(allowedRoles) {
+  const normalizedAllowed = allowedRoles.map(normalizeRole);
   return (req, res, next) => {
-    if (!req.user || !allowedRoles.includes(req.user.role)) {
+    const userRole = normalizeRole(req.user?.role);
+    if (!req.user || !normalizedAllowed.includes(userRole)) {
       return res.status(403).json({
         success: false,
         data: null,

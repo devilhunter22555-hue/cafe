@@ -19,11 +19,16 @@ const refreshCookieOptions = {
 function publicUser(user) {
   return {
     id: user._id,
+    _id: user._id,
     name: user.name,
     email: user.email,
+    phone: user.phone || '',
     role: user.role,
+    roleLabel: user.role === 'owner' ? 'ADMIN' : String(user.role || '').toUpperCase(),
     restaurantId: user.restaurantId,
-    branchId: user.branchId || null
+    cafeId: user.restaurantId,
+    branchId: user.branchId || null,
+    lastLoginAt: user.lastLoginAt || null
   };
 }
 
@@ -31,6 +36,7 @@ function authPayload(user) {
   return {
     userId: user._id,
     restaurantId: user.restaurantId,
+    cafeId: user.restaurantId,
     branchId: user.branchId || null,
     role: user.role
   };
@@ -106,7 +112,8 @@ async function login(req, res, next) {
       throw createError('email and password are required', 400);
     }
 
-    const user = await User.findOne({ email }).select('+password');
+    const normalizedEmail = String(email).toLowerCase().trim();
+    const user = await User.findOne({ email: normalizedEmail }).select('+password');
     if (!user) {
       throw createError('Invalid credentials', 401);
     }
@@ -117,13 +124,23 @@ async function login(req, res, next) {
     }
 
     if (user.isActive === false) {
-      throw createError('Account has been deactivated. Contact your restaurant owner.', 403);
+      throw createError(
+        'This admin/staff account is currently inactive. Please contact the system administrator.',
+        403
+      );
     }
 
     const restaurant = await Restaurant.findById(user.restaurantId);
-    if (!restaurant || restaurant.isActive === false) {
-      throw createError("This restaurant's account has been suspended. Contact support.", 403);
+    if (!restaurant || restaurant.isActive === false || restaurant.status === 'INACTIVE') {
+      throw createError(
+        'This café account is currently inactive. Please contact the system administrator.',
+        403
+      );
     }
+
+    const now = new Date();
+    user.lastLoginAt = now;
+    await User.updateOne({ _id: user._id }, { $set: { lastLoginAt: now } });
 
     const accessToken = generateAccessToken(authPayload(user));
     const refreshToken = generateRefreshToken(authPayload(user));
@@ -152,12 +169,18 @@ async function refreshToken(req, res, next) {
     }
 
     if (user.isActive === false) {
-      throw createError('Account has been deactivated. Contact your restaurant owner.', 403);
+      throw createError(
+        'This admin/staff account is currently inactive. Please contact the system administrator.',
+        403
+      );
     }
 
     const restaurant = await Restaurant.findById(user.restaurantId);
-    if (!restaurant || restaurant.isActive === false) {
-      throw createError("This restaurant's account has been suspended. Contact support.", 403);
+    if (!restaurant || restaurant.isActive === false || restaurant.status === 'INACTIVE') {
+      throw createError(
+        'This café account is currently inactive. Please contact the system administrator.',
+        403
+      );
     }
 
     const accessToken = generateAccessToken(authPayload(user));

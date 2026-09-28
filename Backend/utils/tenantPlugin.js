@@ -17,6 +17,10 @@ function tenantPlugin(schema) {
     }
   });
 
+  schema.virtual('cafeId').get(function getCafeId() {
+    return this.restaurantId;
+  });
+
   const guardedOperations = [
     'find',
     'findOne',
@@ -28,6 +32,12 @@ function tenantPlugin(schema) {
   guardedOperations.forEach((operation) => {
     schema.pre(operation, function guardTenantFilter() {
       const filter = this.getFilter();
+
+      // Allow cafeId alias in query filter if passed instead of restaurantId
+      if (!filter.restaurantId && filter.cafeId) {
+        filter.restaurantId = filter.cafeId;
+        delete filter.cafeId;
+      }
 
       // Mongoose's populate() runs an internal query filtered only by
       // _id (or _id: { $in: [...] }) on the referenced collection.

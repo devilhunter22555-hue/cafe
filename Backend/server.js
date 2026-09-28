@@ -31,6 +31,7 @@ const couponRoutes = require('./routes/couponRoutes');
 const salaryRoutes = require('./routes/salaryRoutes');
 const superAdminRoutes = require('./routes/superAdminRoutes');
 const errorHandler = require('./middleware/errorHandler');
+const { startSalesReportScheduler } = require('./utils/salesReportScheduler');
 
 const requiredEnvVars = ['MONGO_URI', 'JWT_ACCESS_SECRET', 'JWT_REFRESH_SECRET', 'SUPER_ADMIN_JWT_SECRET'];
 const missingEnvVars = requiredEnvVars.filter((name) => !process.env[name]);
@@ -71,7 +72,7 @@ const io = new Server(httpServer, { cors: corsOptions });
 
 const loginRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 5,
+  max: 15,
   standardHeaders: true,
   legacyHeaders: false,
   message: {
@@ -99,7 +100,7 @@ const registerRateLimiter = rateLimit({
 
 const apiRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 200,
+  max: 300,
   standardHeaders: true,
   legacyHeaders: false,
   message: {
@@ -129,7 +130,7 @@ app.use(helmet({
   crossOriginResourcePolicy: false
 }));
 app.use(cors(corsOptions));
-app.use(express.json());
+app.use(express.json({ limit: '5mb' }));
 app.use(mongoSanitize());
 app.use(cookieParser());
 app.use('/api/auth/login', loginRateLimiter);
@@ -175,6 +176,7 @@ app.use(errorHandler);
 const port = process.env.PORT || 5000;
 
 connectDB().then(() => {
+  startSalesReportScheduler();
   httpServer.listen(port, () => {
     console.log(`Server listening on port ${port}`);
   });

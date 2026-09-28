@@ -6,7 +6,9 @@ const {
   getSalesSummary,
   getSalesByDay,
   getTopSellingItems,
-  getCategoryBreakdown
+  getCategoryBreakdown,
+  sendDailySalesReport,
+  sendMonthlySalesReport
 } = require('../controllers/reportController');
 
 const router = express.Router();
@@ -17,5 +19,7 @@ router.get('/summary', getSalesSummary);
 router.get('/sales-by-day', getSalesByDay);
 router.get('/top-items', getTopSellingItems);
 router.get('/category-breakdown', getCategoryBreakdown);
+router.post('/send-daily', sendDailySalesReport);
+router.post('/send-monthly', sendMonthlySalesReport);
 
 module.exports = router;

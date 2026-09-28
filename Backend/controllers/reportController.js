@@ -1,5 +1,9 @@
 const mongoose = require('mongoose');
 const Bill = require('../models/Bill');
+const {
+  runDailySalesReportJob,
+  runMonthlySalesReportJob
+} = require('../utils/salesReportScheduler');
 
 function createError(message, statusCode) {
   const error = new Error(message);
@@ -137,4 +141,73 @@ async function getCategoryBreakdown(req, res, next) {
   }
 }
 
-module.exports = { getSalesSummary, getSalesByDay, getTopSellingItems, getCategoryBreakdown };
+async function sendDailySalesReport(req, res, next) {
+  try {
+    const { report, emailResult } = await runDailySalesReportJob({
+      restaurantId: req.restaurantId || req.body?.restaurantId,
+      branchId: req.branchId || req.body?.branchId
+    });
+
+    if (!report) {
+      throw createError(emailResult?.error || 'Failed to generate daily sales report', 500);
+    }
+
+    res.json({
+      success: true,
+      data: {
+        subject: report.subject,
+        period: report.period,
+        summary: report.data,
+        text: report.text,
+        emailSent: Boolean(emailResult?.sent),
+        recipient: emailResult?.recipient || null,
+        emailNote: emailResult?.error || null
+      },
+      message: emailResult?.sent
+        ? `Daily sales report sent to ${emailResult.recipient}`
+        : `Daily sales report generated (${emailResult?.error || 'SMTP not configured'})`
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function sendMonthlySalesReport(req, res, next) {
+  try {
+    const { report, emailResult } = await runMonthlySalesReportJob({
+      restaurantId: req.restaurantId || req.body?.restaurantId,
+      branchId: req.branchId || req.body?.branchId
+    });
+
+    if (!report) {
+      throw createError(emailResult?.error || 'Failed to generate monthly sales report', 500);
+    }
+
+    res.json({
+      success: true,
+      data: {
+        subject: report.subject,
+        period: report.period,
+        summary: report.data,
+        text: report.text,
+        emailSent: Boolean(emailResult?.sent),
+        recipient: emailResult?.recipient || null,
+        emailNote: emailResult?.error || null
+      },
+      message: emailResult?.sent
+        ? `Monthly sales report sent to ${emailResult.recipient}`
+        : `Monthly sales report generated (${emailResult?.error || 'SMTP not configured'})`
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+module.exports = {
+  getSalesSummary,
+  getSalesByDay,
+  getTopSellingItems,
+  getCategoryBreakdown,
+  sendDailySalesReport,
+  sendMonthlySalesReport
+};
